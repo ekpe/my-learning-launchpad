@@ -4,6 +4,7 @@ import { courses } from '../data/courses';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { sendEmail } from '../services/emailService';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -98,6 +99,28 @@ export const QuizViewer = () => {
       
       setScore(correctCount);
       setIsSubmitted(true);
+
+      // Send email notification if failed
+      if (!passed && user.email) {
+        await sendEmail({
+          to: user.email,
+          subject: `Quiz Update: ${quiz.title}`,
+          text: `Hi ${user.displayName || 'Student'},\n\nYou recently took the quiz "${quiz.title}" in the course "${course.title}".\n\nYour score: ${correctCount}/${totalQuestions} (${Math.round((correctCount / totalQuestions) * 100)}%)\nStatus: Failed\n\nDon't worry! You can retry the quiz anytime to improve your score.`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #1e293b;">Quiz Update: ${quiz.title}</h2>
+              <p>Hi ${user.displayName || 'Student'},</p>
+              <p>You recently took the quiz "<strong>${quiz.title}</strong>" in the course "<strong>${course.title}</strong>".</p>
+              <div style="background-color: #fef2f2; border: 1px solid #fee2e2; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                <p style="margin: 0; color: #991b1b;"><strong>Score:</strong> ${correctCount}/${totalQuestions} (${Math.round((correctCount / totalQuestions) * 100)}%)</p>
+                <p style="margin: 5px 0 0 0; color: #991b1b;"><strong>Status:</strong> Failed</p>
+              </div>
+              <p>Don't worry! You can retry the quiz anytime to improve your score.</p>
+              <a href="${window.location.origin}/course/${courseId}" style="display: inline-block; background-color: #1e3a8a; color: white; padding: 12px 24px; border-radius: 9999px; text-decoration: none; font-weight: bold; margin-top: 20px;">Return to Course</a>
+            </div>
+          `
+        });
+      }
     } catch (error) {
       console.error("Error saving quiz attempt:", error);
     }

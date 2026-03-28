@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebase';
+import { auth, db } from '../firebase';
 import { 
   collection, 
   query, 
@@ -60,6 +60,23 @@ export const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const [showCourseForm, setShowCourseForm] = useState(false);
+  const [showUserForm, setShowUserForm] = useState(false);
+  const [newUser, setNewUser] = useState({
+    email: '',
+    password: '',
+    displayName: '',
+    role: 'STUDENT' as 'ADMIN' | 'INSTRUCTOR' | 'STUDENT'
+  });
+  const [newCourse, setNewCourse] = useState({
+    title: '',
+    description: '',
+    duration: '',
+    audience: '',
+    image: '',
+    price: 0,
+    isFree: false
+  });
 
   useEffect(() => {
     setLoading(true);
@@ -103,12 +120,87 @@ export const AdminDashboard: React.FC = () => {
 
   const handleRoleChange = async (userId: string, newRole: 'ADMIN' | 'INSTRUCTOR' | 'STUDENT') => {
     try {
-      await updateDoc(doc(db, 'users', userId), {
-        role: newRole
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch('/api/admin/update-user-role', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ uid: userId, role: newRole })
       });
-    } catch (error) {
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update role');
+      }
+      
+      alert('Role updated successfully!');
+    } catch (error: any) {
       console.error('Error updating role:', error);
-      alert('Failed to update role. Check permissions.');
+      alert(error.message || 'Failed to update role. Check permissions.');
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSyncing(true);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch('/api/admin/create-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        },
+        body: JSON.stringify(newUser)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create user');
+      }
+
+      setShowUserForm(false);
+      setNewUser({
+        email: '',
+        password: '',
+        displayName: '',
+        role: 'STUDENT'
+      });
+      alert('User created successfully!');
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      alert(error.message || 'Failed to create user.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!window.confirm('Are you sure you want to delete this user? This cannot be undone.')) return;
+    
+    setSyncing(true);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete user');
+      }
+
+      alert('User deleted successfully!');
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      alert(error.message || 'Failed to delete user.');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -130,14 +222,48 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleCreateCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSyncing(true);
+    try {
+      const id = newCourse.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+      await setDoc(doc(db, 'courses', id), {
+        ...newCourse,
+        id,
+        createdAt: serverTimestamp(),
+        price: newCourse.isFree ? 0 : Number(newCourse.price)
+      });
+      setShowCourseForm(false);
+      setNewCourse({
+        title: '',
+        description: '',
+        duration: '',
+        audience: '',
+        image: '',
+        price: 0,
+        isFree: false
+      });
+      alert('Course created successfully!');
+    } catch (error) {
+      console.error('Error creating course:', error);
+      alert('Failed to create course.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const filteredUsers = users.filter(u => 
     u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredCourses = dbCourses.filter(c => 
-    c.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCourses = dbCourses
+    .filter(c => c.title.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => {
+      if (a.isFree && !b.isFree) return -1;
+      if (!a.isFree && b.isFree) return 1;
+      return 0;
+    });
 
   const filteredEnrollments = enrollments.map(e => ({
     ...e,
@@ -175,15 +301,33 @@ export const AdminDashboard: React.FC = () => {
                 className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 transition-all w-full md:w-64"
               />
             </div>
-            {activeTab === 'courses' && (
+            {activeTab === 'users' && (
               <Button 
-                onClick={syncCourses} 
-                disabled={syncing}
-                className="rounded-xl flex items-center gap-2"
+                onClick={() => setShowUserForm(true)}
+                className="rounded-xl flex items-center gap-2 bg-blue-900 hover:bg-blue-800"
               >
-                {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                Sync Static Data
+                <Plus className="w-4 h-4" />
+                New User
               </Button>
+            )}
+            {activeTab === 'courses' && (
+              <div className="flex items-center gap-2">
+                <Button 
+                  onClick={() => setShowCourseForm(true)}
+                  className="rounded-xl flex items-center gap-2 bg-green-600 hover:bg-green-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Course
+                </Button>
+                <Button 
+                  onClick={syncCourses} 
+                  disabled={syncing}
+                  className="rounded-xl flex items-center gap-2"
+                >
+                  {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                  Sync Static Data
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -242,6 +386,213 @@ export const AdminDashboard: React.FC = () => {
 
         {/* Content */}
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+          <AnimatePresence>
+            {showUserForm && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="border-b border-slate-200 bg-slate-50/50 overflow-hidden"
+              >
+                <form onSubmit={handleCreateUser} className="p-8 space-y-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-slate-900">Add New User</h2>
+                    <button 
+                      type="button"
+                      onClick={() => setShowUserForm(false)}
+                      className="text-slate-400 hover:text-slate-600"
+                    >
+                      <XCircle className="w-6 h-6" />
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700">Full Name</label>
+                      <input
+                        required
+                        type="text"
+                        value={newUser.displayName}
+                        onChange={(e) => setNewUser({ ...newUser, displayName: e.target.value })}
+                        placeholder="John Doe"
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 outline-none transition-all"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700">Email Address</label>
+                      <input
+                        required
+                        type="email"
+                        value={newUser.email}
+                        onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                        placeholder="john@example.com"
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 outline-none transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700">Password</label>
+                      <input
+                        required
+                        type="password"
+                        value={newUser.password}
+                        onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                        placeholder="••••••••"
+                        minLength={6}
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 outline-none transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700">Initial Role</label>
+                      <select
+                        value={newUser.role}
+                        onChange={(e) => setNewUser({ ...newUser, role: e.target.value as any })}
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 outline-none transition-all bg-white"
+                      >
+                        <option value="STUDENT">STUDENT</option>
+                        <option value="INSTRUCTOR">INSTRUCTOR</option>
+                        <option value="ADMIN">ADMIN</option>
+                      </select>
+                    </div>
+
+                    <div className="md:col-span-2 flex justify-end pt-4">
+                      <Button 
+                        type="submit"
+                        disabled={syncing}
+                        className="rounded-xl px-12 py-3 flex items-center justify-center gap-2"
+                      >
+                        {syncing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                        Create User
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+              </motion.div>
+            )}
+
+            {showCourseForm && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="border-b border-slate-200 bg-slate-50/50 overflow-hidden"
+              >
+                <form onSubmit={handleCreateCourse} className="p-8 space-y-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-slate-900">Create New Course</h2>
+                    <button 
+                      type="button"
+                      onClick={() => setShowCourseForm(false)}
+                      className="text-slate-400 hover:text-slate-600"
+                    >
+                      <XCircle className="w-6 h-6" />
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700">Course Title</label>
+                      <input
+                        required
+                        type="text"
+                        value={newCourse.title}
+                        onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
+                        placeholder="e.g. AI for Executives"
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 outline-none transition-all"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700">Image URL</label>
+                      <input
+                        required
+                        type="url"
+                        value={newCourse.image}
+                        onChange={(e) => setNewCourse({ ...newCourse, image: e.target.value })}
+                        placeholder="https://images.unsplash.com/..."
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 outline-none transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-sm font-semibold text-slate-700">Description</label>
+                      <textarea
+                        required
+                        value={newCourse.description}
+                        onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
+                        placeholder="Brief overview of the course..."
+                        rows={3}
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 outline-none transition-all resize-none"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700">Duration</label>
+                      <input
+                        required
+                        type="text"
+                        value={newCourse.duration}
+                        onChange={(e) => setNewCourse({ ...newCourse, duration: e.target.value })}
+                        placeholder="e.g. 4 Weeks"
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 outline-none transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700">Target Audience</label>
+                      <input
+                        required
+                        type="text"
+                        value={newCourse.audience}
+                        onChange={(e) => setNewCourse({ ...newCourse, audience: e.target.value })}
+                        placeholder="e.g. Business Leaders"
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 outline-none transition-all"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-8 p-4 bg-white rounded-xl border border-slate-200">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="isFree"
+                          checked={newCourse.isFree}
+                          onChange={(e) => setNewCourse({ ...newCourse, isFree: e.target.checked })}
+                          className="w-4 h-4 text-blue-900 rounded focus:ring-blue-900"
+                        />
+                        <label htmlFor="isFree" className="text-sm font-semibold text-slate-700">Free Course</label>
+                      </div>
+                      
+                      {!newCourse.isFree && (
+                        <div className="flex-1 flex items-center gap-2">
+                          <label className="text-sm font-semibold text-slate-700">Price ($)</label>
+                          <input
+                            type="number"
+                            value={newCourse.price}
+                            onChange={(e) => setNewCourse({ ...newCourse, price: Number(e.target.value) })}
+                            className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 outline-none transition-all"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-end">
+                      <Button 
+                        type="submit"
+                        disabled={syncing}
+                        className="w-full rounded-xl py-3 flex items-center justify-center gap-2"
+                      >
+                        {syncing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                        Save Course
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {activeTab === 'users' && (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -288,9 +639,15 @@ export const AdminDashboard: React.FC = () => {
                         {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button className="p-2 text-slate-400 hover:text-slate-600 transition-colors">
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          <button 
+                            onClick={() => handleDeleteUser(user.uid)}
+                            className="p-2 text-slate-400 hover:text-red-600 transition-colors"
+                            title="Delete User"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

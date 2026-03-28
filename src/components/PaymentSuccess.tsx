@@ -3,6 +3,7 @@ import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { sendEmail } from '../services/emailService';
 import { CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
 import { Button } from './ui/Button';
 import { motion } from 'motion/react';
@@ -45,6 +46,28 @@ export const PaymentSuccess = () => {
             sessionId,
             isFree: false
           });
+
+          // Send enrollment email
+          if (user.email) {
+            await sendEmail({
+              to: user.email,
+              subject: `Welcome to your new course!`,
+              text: `Hi ${user.displayName || 'Student'},\n\nYou've successfully enrolled in your new course.\n\nStart learning now: ${window.location.origin}/course/${courseId}`,
+              html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h2 style="color: #1e3a8a;">Welcome to your new course!</h2>
+                  <p>Hi ${user.displayName || 'Student'},</p>
+                  <p>You've successfully enrolled in your new course. We're excited to have you on board!</p>
+                  <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                    <p style="margin: 0;"><strong>Status:</strong> Paid Enrollment</p>
+                    <p style="margin: 5px 0 0 0;"><strong>Transaction ID:</strong> ${sessionId}</p>
+                  </div>
+                  <p>Ready to start learning?</p>
+                  <a href="${window.location.origin}/course/${courseId}" style="display: inline-block; background-color: #1e3a8a; color: white; padding: 12px 24px; border-radius: 9999px; text-decoration: none; font-weight: bold; margin-top: 20px;">Go to Course</a>
+                </div>
+              `
+            });
+          }
 
           setStatus('SUCCESS');
         } else {

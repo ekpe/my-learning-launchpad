@@ -74,7 +74,13 @@ export const Courses = () => {
     const unsub = onSnapshot(collection(db, 'courses'), (snapshot) => {
       if (!snapshot.empty) {
         const dbCourses = snapshot.docs.map(doc => doc.data() as Course);
-        setDisplayCourses(dbCourses);
+        // Sort: free courses first
+        const sorted = [...dbCourses].sort((a, b) => {
+          if (a.isFree && !b.isFree) return -1;
+          if (!a.isFree && b.isFree) return 1;
+          return 0;
+        });
+        setDisplayCourses(sorted);
       }
       setLoading(false);
     }, (error) => {

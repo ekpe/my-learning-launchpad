@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { doc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { sendEmail } from '../services/emailService';
 import { AuthModal } from './AuthModal';
 import { DiscussionForum } from './DiscussionForum';
 import { Course } from '../types';
@@ -119,6 +120,28 @@ export const CourseDetail = () => {
         courseTitle: course.title,
         isFree: true
       });
+
+      // Send enrollment email
+      if (user.email) {
+        await sendEmail({
+          to: user.email,
+          subject: `Welcome to ${course.title}!`,
+          text: `Hi ${user.displayName || 'Student'},\n\nYou've successfully enrolled in "${course.title}".\n\nStart learning now: ${window.location.origin}/course/${course.id}`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #1e3a8a;">Welcome to ${course.title}!</h2>
+              <p>Hi ${user.displayName || 'Student'},</p>
+              <p>You've successfully enrolled in "<strong>${course.title}</strong>". We're excited to have you on board!</p>
+              <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                <p style="margin: 0;"><strong>Course:</strong> ${course.title}</p>
+                <p style="margin: 5px 0 0 0;"><strong>Duration:</strong> ${course.duration}</p>
+              </div>
+              <p>Ready to start learning?</p>
+              <a href="${window.location.origin}/course/${course.id}" style="display: inline-block; background-color: #1e3a8a; color: white; padding: 12px 24px; border-radius: 9999px; text-decoration: none; font-weight: bold; margin-top: 20px;">Go to Course</a>
+            </div>
+          `
+        });
+      }
     } catch (error) {
       console.error("Enrollment error:", error);
       alert("Failed to enroll. Please try again.");
