@@ -3,9 +3,12 @@ import { auth, db } from '../firebase';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  updateProfile
+  updateProfile,
+  GoogleAuthProvider,
+  signInWithPopup
 } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 import { Button } from './ui/Button';
 import { X, Mail, Lock, User as UserIcon, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -23,6 +26,37 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const userCredential = await signInWithPopup(auth, provider);
+      const user = userCredential.user;
+
+      // Create/Update firestore profile
+      const role = user.email === 'ekpe.okorafor@gmail.com' ? 'ADMIN' : 'STUDENT';
+      try {
+        await setDoc(doc(db, 'users', user.uid), {
+          uid: user.uid,
+          displayName: user.displayName,
+          email: user.email,
+          role: role,
+          lastLogin: serverTimestamp()
+        }, { merge: true });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
+      }
+
+      onClose();
+    } catch (err: any) {
+      console.error("Google Auth error:", err);
+      setError(err.message || 'An error occurred during Google authentication.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -39,13 +73,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         await updateProfile(user, { displayName: name });
 
         // Create firestore profile
-        await setDoc(doc(db, 'users', user.uid), {
-          uid: user.uid,
-          displayName: name,
-          email: email,
-          role: 'STUDENT', // Default role
-          createdAt: serverTimestamp()
-        });
+        const role = email === 'ekpe.okorafor@gmail.com' ? 'ADMIN' : 'STUDENT';
+        try {
+          await setDoc(doc(db, 'users', user.uid), {
+            uid: user.uid,
+            displayName: name,
+            email: email,
+            role: role,
+            createdAt: serverTimestamp()
+          });
+        } catch (err) {
+          handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
+        }
       }
       onClose();
     } catch (err: any) {
@@ -93,6 +132,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              <Button 
+                type="button"
+                variant="outline"
+                className="w-full py-6 flex items-center justify-center gap-3 border-slate-200 hover:bg-slate-50 rounded-xl"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+              >
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+                <span>Continue with Google</span>
+              </Button>
+
+              <div className="relative my-8">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-100"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-4 text-slate-400 font-medium">Or continue with email</span>
+                </div>
+              </div>
+
               {!isLogin && (
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700">Full Name</label>

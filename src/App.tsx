@@ -203,6 +203,7 @@ const StudentDashboard = () => {
   );
 };
 
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { usePageTracking } from './hooks/usePageTracking';
 
 const PageTracker = () => {
@@ -212,76 +213,78 @@ const PageTracker = () => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <ScrollToTop />
-        <PageTracker />
-        <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
-          <Navbar />
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/course/:id" element={<CourseDetail />} />
-            <Route path="/payment-success" element={<PaymentSuccess />} />
-            
-            {/* Protected Student Routes */}
-            <Route 
-              path="/dashboard" 
-              element={
-                <ProtectedRoute allowedRoles={['STUDENT', 'INSTRUCTOR', 'ADMIN']}>
-                  <StudentDashboard />
-                </ProtectedRoute>
-              } 
-            />
+    <ErrorBoundary>
+      <AuthProvider>
+        <Router>
+          <ScrollToTop />
+          <PageTracker />
+          <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
+            <Navbar />
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/course/:id" element={<CourseDetail />} />
+              <Route path="/payment-success" element={<PaymentSuccess />} />
+              
+              {/* Protected Student Routes */}
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute allowedRoles={['STUDENT', 'INSTRUCTOR', 'ADMIN']}>
+                    <StudentDashboard />
+                  </ProtectedRoute>
+                } 
+              />
 
-            {/* Protected Lesson and Quiz Routes */}
-            <Route 
-              path="/course/:courseId/lesson/:moduleIndex/:lessonIndex" 
-              element={
-                <ProtectedRoute allowedRoles={['STUDENT', 'INSTRUCTOR', 'ADMIN']}>
-                  <LessonViewer />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/course/:courseId/quiz/:moduleIndex" 
-              element={
-                <ProtectedRoute allowedRoles={['STUDENT', 'INSTRUCTOR', 'ADMIN']}>
-                  <QuizViewer />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/certificate/:certificateId" 
-              element={
-                <ProtectedRoute allowedRoles={['STUDENT', 'INSTRUCTOR', 'ADMIN']}>
-                  <Certificate />
-                </ProtectedRoute>
-              } 
-            />
+              {/* Protected Lesson and Quiz Routes */}
+              <Route 
+                path="/course/:courseId/lesson/:moduleIndex/:lessonIndex" 
+                element={
+                  <ProtectedRoute allowedRoles={['STUDENT', 'INSTRUCTOR', 'ADMIN']}>
+                    <LessonViewer />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/course/:courseId/quiz/:moduleIndex" 
+                element={
+                  <ProtectedRoute allowedRoles={['STUDENT', 'INSTRUCTOR', 'ADMIN']}>
+                    <QuizViewer />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/certificate/:certificateId" 
+                element={
+                  <ProtectedRoute allowedRoles={['STUDENT', 'INSTRUCTOR', 'ADMIN']}>
+                    <Certificate />
+                  </ProtectedRoute>
+                } 
+              />
 
-            {/* Protected Instructor Routes */}
-            <Route 
-              path="/instructor" 
-              element={
-                <ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN']}>
-                  <InstructorDashboard />
-                </ProtectedRoute>
-              } 
-            />
+              {/* Protected Instructor Routes */}
+              <Route 
+                path="/instructor" 
+                element={
+                  <ProtectedRoute allowedRoles={['INSTRUCTOR', 'ADMIN']}>
+                    <InstructorDashboard />
+                  </ProtectedRoute>
+                } 
+              />
 
-            {/* Protected Admin Routes */}
-            <Route 
-              path="/admin" 
-              element={
-                <ProtectedRoute allowedRoles={['ADMIN']}>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              } 
-            />
-          </Routes>
-          <Footer />
-        </div>
-      </Router>
-    </AuthProvider>
+              {/* Protected Admin Routes */}
+              <Route 
+                path="/admin" 
+                element={
+                  <ProtectedRoute allowedRoles={['ADMIN']}>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+            </Routes>
+            <Footer />
+          </div>
+        </Router>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
