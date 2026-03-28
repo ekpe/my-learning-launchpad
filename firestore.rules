@@ -1,0 +1,190 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (matches request.auth.uid)
+    // Fields:
+    //   - uid: string (required, immutable) - User's unique ID
+    //   - displayName: string (optional) - User's full name
+    //   - email: string (required, immutable) - User's email address
+    //   - role: string (required) - User's role ('ADMIN', 'INSTRUCTOR', 'STUDENT')
+    //   - createdAt: timestamp (required, immutable) - Creation time
+    //
+    // Collection: enrollments
+    // Document ID: {enrollmentId} (usually userId_courseId)
+    // Fields:
+    //   - userId: string (required, immutable) - Student's unique ID
+    //   - courseId: string (required, immutable) - Course's unique ID
+    //   - status: string (required) - Enrollment status ('ENROLLED', 'IN_PROGRESS', 'COMPLETED')
+    //   - enrolledAt: timestamp (required, immutable) - Enrollment time
+    //   - progress: number (optional) - Course progress percentage
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        ((request.auth.token.email == "ekpe.okorafor@gmail.com") ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ADMIN'));
+    }
+
+    function isInstructor() {
+      return isAuthenticated() && 
+        (isAdmin() || 
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'INSTRUCTOR'));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             data.role in ['ADMIN', 'INSTRUCTOR', 'STUDENT'] &&
+             (data.role == 'STUDENT' || isAdmin());
+    }
+
+    function isValidEnrollment(data) {
+      return data.keys().hasAll(['userId', 'courseId', 'status', 'enrolledAt']) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.courseId is string &&
+             data.status in ['ENROLLED', 'IN_PROGRESS', 'COMPLETED'] &&
+             data.enrolledAt is timestamp &&
+             (!('progress' in data) || data.progress is number) &&
+             (!('completedLessons' in data) || data.completedLessons is list);
+    }
+
+    function isValidQuizAttempt(data) {
+      return data.keys().hasAll(['userId', 'courseId', 'quizId', 'score', 'totalQuestions', 'completedAt', 'passed']) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.courseId is string &&
+             data.quizId is string &&
+             data.score is number &&
+             data.totalQuestions is number &&
+             data.completedAt is timestamp &&
+             data.passed is bool;
+    }
+
+    function isValidCertificate(data) {
+      return data.keys().hasAll(['userId', 'courseId', 'courseTitle', 'userName', 'issuedAt', 'certificateId']) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.courseId is string &&
+             data.courseTitle is string &&
+             data.userName is string &&
+             data.issuedAt is timestamp &&
+             data.certificateId is string;
+    }
+
+    function isValidForumPost(data) {
+      return data.keys().hasAll(['courseId', 'userId', 'userName', 'content', 'createdAt']) &&
+             data.courseId is string &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.userName is string &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 5000 &&
+             data.createdAt is timestamp &&
+             (!('parentId' in data) || data.parentId is string) &&
+             (!('likes' in data) || data.likes is list);
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isInstructor();
+      
+      allow create: if isOwner(userId) && 
+                      isValidUser(request.resource.data) && 
+                      request.resource.data.role == 'STUDENT';
+                      
+      allow update: if (isOwner(userId) || isAdmin()) && 
+                      isValidUser(request.resource.data) &&
+                      request.resource.data.uid == resource.data.uid &&
+                      request.resource.data.email == resource.data.email &&
+                      (isOwner(userId) ? request.resource.data.role == resource.data.role : true);
+    }
+
+    match /courses/{courseId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /courses {
+      allow read: if true;
+    }
+
+    match /enrollments/{enrollmentId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isInstructor());
+      
+      allow create: if isAuthenticated() && 
+                      isValidEnrollment(request.resource.data) &&
+                      request.resource.data.userId == request.auth.uid;
+                      
+      allow update: if isAuthenticated() && 
+                      (request.auth.uid == resource.data.userId || isAdmin()) &&
+                      isValidEnrollment(request.resource.data) &&
+                      request.resource.data.userId == resource.data.userId &&
+                      request.resource.data.courseId == resource.data.courseId;
+    }
+
+    match /quizAttempts/{attemptId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isInstructor());
+      
+      allow create: if isAuthenticated() && 
+                      isValidQuizAttempt(request.resource.data) &&
+                      request.resource.data.userId == request.auth.uid;
+    }
+
+    match /certificates/{certificateId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isInstructor());
+      
+      allow create: if isAuthenticated() && 
+                      isValidCertificate(request.resource.data) &&
+                      request.resource.data.userId == request.auth.uid;
+    }
+
+    match /forumPosts/{postId} {
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated() && 
+                      isValidForumPost(request.resource.data) &&
+                      request.resource.data.userId == request.auth.uid;
+                      
+      allow update: if isAuthenticated() && 
+                      (request.auth.uid == resource.data.userId || isAdmin()) &&
+                      isValidForumPost(request.resource.data) &&
+                      request.resource.data.userId == resource.data.userId;
+                      
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.userId || isAdmin());
+    }
+
+    match /analytics/{eventId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && 
+                      request.resource.data.userId == request.auth.uid &&
+                      request.resource.data.event is string &&
+                      request.resource.data.timestamp is timestamp;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
