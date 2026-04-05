@@ -17,6 +17,7 @@ export interface Course {
   image: string;
   isFree?: boolean;
   price?: number;
+  order?: number;
   fullDescription?: string;
   learningObjectives?: string[];
   curriculum?: {

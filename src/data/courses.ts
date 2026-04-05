@@ -9,6 +9,7 @@ export const courses: Course[] = [
     audience: "Business Leaders, Senior Managers, Decision Makers",
     image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=800",
     isFree: true,
+    order: 1,
     fullDescription: "AI Strategy for Leaders and Decision Makers is a practical, executive-focused course designed to equip business leaders, senior managers, and decision-makers with the knowledge and frameworks needed to successfully leverage Artificial Intelligence for organizational transformation. Rather than focusing on technical details, this course emphasizes strategic understanding, real-world applications, governance considerations, and implementation roadmaps, enabling leaders to make informed AI investment decisions and drive measurable business value.",
     learningObjectives: [
       "Understand AI capabilities, limitations, and business impact",
@@ -105,6 +106,41 @@ export const courses: Course[] = [
     }
   },
   {
+    id: "ai-strategy-intensive",
+    title: "AI Strategy Intensive: From Clarity to Action",
+    description: "A high-impact program designed to bridge the gap between AI theory and practical business execution.",
+    duration: "2–3 weeks",
+    audience: "Professionals, Managers, Emerging Leaders",
+    image: "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=800",
+    price: 199,
+    isFree: false,
+    order: 2,
+    fullDescription: "AI Strategy Intensive: From Clarity to Action is a 2-3 week program that combines self-paced learning with a live strategy session. It is specifically designed for professionals and managers who need to move beyond AI buzzwords and start implementing real-world solutions. You will learn how to identify high-impact AI use cases, evaluate technical feasibility, and build a business case for AI adoption.",
+    learningObjectives: [
+      "Define a clear AI vision for your team or department",
+      "Evaluate AI tools and platforms for business efficiency",
+      "Design a pilot project with measurable KPIs",
+      "Navigate the ethical and security challenges of AI",
+      "Lead cross-functional teams through AI adoption"
+    ],
+    curriculum: [
+      {
+        module: "Module 1: AI Fundamentals & Business Value",
+        topics: [
+          { title: "The AI Landscape: Beyond the Hype", videoUrl: "https://www.youtube.com/watch?v=ad79nYk2keg" },
+          { title: "Identifying High-Impact Use Cases", videoUrl: "https://www.youtube.com/watch?v=5ka_vY_N-S4" }
+        ]
+      },
+      {
+        module: "Module 2: Strategy & Implementation",
+        topics: [
+          { title: "Building Your AI Roadmap", videoUrl: "https://www.youtube.com/watch?v=R9OHn5ZF4Uo" },
+          { title: "Live Session: Strategy Workshop", videoUrl: "" }
+        ]
+      }
+    ]
+  },
+  {
     id: "ai-strategy-certification",
     title: "AI Strategy Certification: Designing Enterprise AI Roadmaps",
     description: "A deep-dive certification program on building robust, scalable AI roadmaps that align with long-term corporate strategy.",
@@ -112,6 +148,7 @@ export const courses: Course[] = [
     audience: "Chief Strategy Officers, VPs, Directors",
     image: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=800",
     price: 499,
+    order: 3,
     fullDescription: "Become a certified AI strategist. This intensive program equips you with the tools and frameworks needed to design and lead enterprise-wide AI transformations. You will work on real-world case studies and develop a comprehensive AI roadmap for your organization.",
     curriculum: [
       {
@@ -148,6 +185,7 @@ export const courses: Course[] = [
     audience: "COOs, CTOs, Implementation Leads",
     image: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=800",
     price: 799,
+    order: 4,
     fullDescription: "Bridging the gap between strategy and execution. This course focuses on the operational realities of AI implementation. We cover data infrastructure, model deployment, monitoring, and the critical human element of AI adoption.",
     curriculum: [
       {
@@ -184,6 +222,7 @@ export const courses: Course[] = [
     audience: "Forward-thinking CEOs, Innovation Leaders",
     image: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&q=80&w=800",
     price: 999,
+    order: 5,
     fullDescription: "The next frontier of AI is agentic. This course explores the transition from AI as a tool to AI as an autonomous agent. We discuss the strategic implications of multi-agent systems, autonomous workflows, and the evolving role of human leadership in an agentic world.",
     curriculum: [
       {

@@ -78,7 +78,7 @@ export const Courses = () => {
         const sorted = [...dbCourses].sort((a, b) => {
           if (a.isFree && !b.isFree) return -1;
           if (!a.isFree && b.isFree) return 1;
-          return 0;
+          return (a.order || 0) - (b.order || 0);
         });
         setDisplayCourses(sorted);
       }

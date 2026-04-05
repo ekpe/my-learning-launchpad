@@ -75,7 +75,8 @@ export const AdminDashboard: React.FC = () => {
     audience: '',
     image: '',
     price: 0,
-    isFree: false
+    isFree: false,
+    order: 10
   });
 
   useEffect(() => {
@@ -231,7 +232,8 @@ export const AdminDashboard: React.FC = () => {
         ...newCourse,
         id,
         createdAt: serverTimestamp(),
-        price: newCourse.isFree ? 0 : Number(newCourse.price)
+        price: newCourse.isFree ? 0 : Number(newCourse.price),
+        order: Number(newCourse.order)
       });
       setShowCourseForm(false);
       setNewCourse({
@@ -241,7 +243,8 @@ export const AdminDashboard: React.FC = () => {
         audience: '',
         image: '',
         price: 0,
-        isFree: false
+        isFree: false,
+        order: 10
       });
       alert('Course created successfully!');
     } catch (error) {
@@ -262,7 +265,7 @@ export const AdminDashboard: React.FC = () => {
     .sort((a, b) => {
       if (a.isFree && !b.isFree) return -1;
       if (!a.isFree && b.isFree) return 1;
-      return 0;
+      return (a.order || 0) - (b.order || 0);
     });
 
   const filteredEnrollments = enrollments.map(e => ({
@@ -575,6 +578,18 @@ export const AdminDashboard: React.FC = () => {
                           />
                         </div>
                       )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700">Display Order (Lower = First)</label>
+                      <input
+                        required
+                        type="number"
+                        value={newCourse.order}
+                        onChange={(e) => setNewCourse({ ...newCourse, order: Number(e.target.value) })}
+                        placeholder="e.g. 10"
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-900/20 focus:border-blue-900 outline-none transition-all"
+                      />
                     </div>
 
                     <div className="flex items-end">
