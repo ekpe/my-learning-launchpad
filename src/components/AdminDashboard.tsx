@@ -103,11 +103,26 @@ export const AdminDashboard: React.FC = () => {
 
     // Subscribe to analytics
     const analyticsUnsub = onSnapshot(collection(db, 'analytics'), (snapshot) => {
-      const analyticsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        timestamp: doc.data().timestamp?.toDate() || new Date()
-      }));
+      const analyticsData = snapshot.docs.map(doc => {
+        const data = doc.data();
+        let timestamp = new Date();
+        
+        if (data.timestamp) {
+          if (typeof data.timestamp.toDate === 'function') {
+            timestamp = data.timestamp.toDate();
+          } else if (data.timestamp instanceof Date) {
+            timestamp = data.timestamp;
+          } else if (data.timestamp.seconds) {
+            timestamp = new Date(data.timestamp.seconds * 1000);
+          }
+        }
+
+        return {
+          id: doc.id,
+          ...data,
+          timestamp
+        };
+      });
       setAnalytics(analyticsData);
     });
 

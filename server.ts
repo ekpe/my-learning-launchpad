@@ -20,26 +20,46 @@ async function startServer() {
 
   console.log("Starting server initialization...");
 
-  // Initialize Firebase Admin lazily
+  // Initialize Firebase Admin
   let db: admin.firestore.Firestore;
   let auth: admin.auth.Auth;
 
   try {
     const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+    console.log(`Reading config from: ${configPath}`);
     const firebaseConfig = JSON.parse(readFileSync(configPath, "utf-8"));
+    console.log(`Project ID: ${firebaseConfig.projectId}`);
+    console.log(`Database ID: ${firebaseConfig.firestoreDatabaseId}`);
     
+    // In this environment, we should try to initialize without arguments first
+    // as the environment variables are usually pre-configured.
     if (!admin.apps.length) {
-      admin.initializeApp({
-        projectId: firebaseConfig.projectId,
-      });
+      try {
+        admin.initializeApp();
+        console.log("Firebase Admin app initialized with default credentials");
+      } catch (initError) {
+        console.warn("Default initialization failed, trying with projectId:", initError);
+        admin.initializeApp({
+          projectId: firebaseConfig.projectId,
+        });
+        console.log("Firebase Admin app initialized with projectId");
+      }
+    } else {
+      console.log(`Firebase Admin already has ${admin.apps.length} apps initialized`);
     }
     
-    db = admin.firestore(firebaseConfig.firestoreDatabaseId);
     auth = admin.auth();
-    console.log("Firebase Admin initialized successfully");
+    
+    // Use the specific database ID if provided
+    if (firebaseConfig.firestoreDatabaseId) {
+      db = admin.firestore(firebaseConfig.firestoreDatabaseId);
+    } else {
+      db = admin.firestore();
+    }
+    
+    console.log("Firebase Admin services (Auth & Firestore) initialized");
   } catch (error) {
-    console.error("Failed to initialize Firebase Admin:", error);
-    // We don't exit here to allow the server to start and show errors in the UI
+    console.error("CRITICAL: Failed to initialize Firebase Admin:", error);
   }
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
@@ -193,16 +213,22 @@ async function startServer() {
 
   app.post("/api/send-email", async (req, res) => {
     try {
-      const { to, subject, text, html } = req.body;
+      const { to, subject, text, html, from } = req.body;
 
-      if (!process.env.SENDGRID_API_KEY || !process.env.SENDGRID_FROM_EMAIL) {
-        console.warn("SendGrid not configured. Email not sent.");
-        return res.status(200).json({ status: "skipped", message: "SendGrid not configured" });
+      if (!process.env.SENDGRID_API_KEY) {
+        console.warn("SendGrid API key not configured. Email not sent.");
+        return res.status(200).json({ status: "skipped", message: "SendGrid API key not configured" });
+      }
+
+      const fromEmail = from || process.env.SENDGRID_FROM_EMAIL;
+      if (!fromEmail) {
+        console.warn("SendGrid 'from' email not configured. Email not sent.");
+        return res.status(200).json({ status: "skipped", message: "SendGrid 'from' email not configured" });
       }
 
       const msg = {
         to,
-        from: process.env.SENDGRID_FROM_EMAIL,
+        from: fromEmail,
         subject,
         text,
         html,

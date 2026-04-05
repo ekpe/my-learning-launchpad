@@ -177,9 +177,21 @@ service cloud.firestore {
     match /analytics/{eventId} {
       allow read: if isAdmin();
       allow create: if request.resource.data.event is string &&
-                      request.resource.data.timestamp is timestamp &&
-                      (!('userId' in request.resource.data) || (isAuthenticated() && request.resource.data.userId == request.auth.uid)) &&
-                      (!('userEmail' in request.resource.data) || (isAuthenticated() && request.resource.data.userEmail == request.auth.token.email));
+                      (request.resource.data.timestamp is timestamp || request.resource.data.timestamp == request.time) &&
+                      (!('userId' in request.resource.data) || request.resource.data.userId is string) &&
+                      (!('userEmail' in request.resource.data) || request.resource.data.userEmail is string) &&
+                      (!('metadata' in request.resource.data) || request.resource.data.metadata is map);
+    }
+
+    match /leads/{leadId} {
+      allow read: if isAdmin();
+      allow create: if request.resource.data.email is string &&
+                      request.resource.data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+                      request.resource.data.name is string &&
+                      request.resource.data.name.size() > 0 &&
+                      request.resource.data.source is string &&
+                      request.resource.data.status is string &&
+                      (request.resource.data.createdAt is timestamp || request.resource.data.createdAt == request.time);
     }
 
     // Default deny

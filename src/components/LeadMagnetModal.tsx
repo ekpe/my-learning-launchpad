@@ -42,15 +42,16 @@ export const LeadMagnetModal: React.FC<LeadMagnetModalProps> = ({ isOpen, onClos
           },
           body: JSON.stringify({
             to: email,
+            from: 'info@mylearninglaunchpad.com',
             subject: 'Your Free AI Strategy Playbook is Here!',
-            text: `Hi ${name},\n\nThank you for downloading the AI Strategy Playbook. You can access it here: [LINK_TO_GUIDE]\n\nBest regards,\nThe AI Executive Team`,
+            text: `Hi ${name},\n\nThank you for downloading the AI Strategy Playbook. You can access it here: https://mylearninglaunchpad.com/downloads/AI-Strategy-for-Leaders.pdf\n\nBest regards,\nThe AI Executive Team`,
             html: `
-              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; rounded: 12px;">
+              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
                 <h2 style="color: #1e3a8a;">Your AI Strategy Playbook is Here!</h2>
                 <p>Hi ${name},</p>
                 <p>Thank you for downloading the <strong>AI Strategy Playbook</strong>. This guide is designed to help you cut through the noise and start executing AI the right way.</p>
                 <div style="margin: 30px 0;">
-                  <a href="#" style="background-color: #1e3a8a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">Download the Playbook (PDF)</a>
+                  <a href="https://mylearninglaunchpad.com/downloads/AI-Strategy-for-Leaders.pdf" style="background-color: #1e3a8a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Download the Playbook (PDF)</a>
                 </div>
                 <p>If you have any questions or want to discuss how to apply these frameworks to your specific business, feel free to reply to this email.</p>
                 <p>Best regards,<br/>The AI Executive Team</p>
