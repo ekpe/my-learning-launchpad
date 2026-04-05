@@ -20,18 +20,42 @@ interface AnalyticsData {
   metadata?: Record<string, any>;
 }
 
+const stripUndefined = (obj: any): any => {
+  if (Array.isArray(obj)) {
+    return obj.map(stripUndefined);
+  } else if (obj !== null && typeof obj === 'object') {
+    return Object.entries(obj).reduce((acc: any, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = stripUndefined(value);
+      }
+      return acc;
+    }, {});
+  }
+  return obj;
+};
+
 export const logEvent = async (event: AnalyticsEvent, metadata?: Record<string, any>) => {
   try {
     const user = auth.currentUser;
-    const analyticsData: AnalyticsData = {
+    const analyticsData: any = {
       event,
-      userId: user?.uid,
-      userEmail: user?.email || undefined,
       timestamp: serverTimestamp(),
-      metadata,
     };
 
-    await addDoc(collection(db, 'analytics'), analyticsData);
+    if (metadata) {
+      analyticsData.metadata = metadata;
+    }
+
+    if (user?.uid) {
+      analyticsData.userId = user.uid;
+    }
+
+    if (user?.email) {
+      analyticsData.userEmail = user.email;
+    }
+
+    const cleanData = stripUndefined(analyticsData);
+    await addDoc(collection(db, 'analytics'), cleanData);
   } catch (error) {
     console.error('Error logging analytics event:', error);
   }

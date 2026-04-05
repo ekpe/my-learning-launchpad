@@ -11,10 +11,7 @@ import { sendEmail } from '../services/emailService';
 import { AuthModal } from './AuthModal';
 import { DiscussionForum } from './DiscussionForum';
 import { Course } from '../types';
-import { loadStripe } from '@stripe/stripe-js';
 import { logEvent, AnalyticsEvent } from '../services/analyticsService';
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 export const CourseDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -95,15 +92,12 @@ export const CourseDetail = () => {
         const session = await response.json();
         if (session.error) throw new Error(session.error);
 
-        const stripe = await stripePromise;
-        if (!stripe) throw new Error('Stripe failed to load');
+        if (session.url) {
+          window.location.href = session.url;
+          return;
+        }
 
-        const { error } = await (stripe as any).redirectToCheckout({
-          sessionId: session.id,
-        });
-
-        if (error) throw new Error(error.message);
-        return;
+        throw new Error('Stripe session URL not found');
       }
 
       const enrollmentId = `${user.uid}_${id}`;

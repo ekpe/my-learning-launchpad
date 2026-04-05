@@ -110,6 +110,7 @@ export const courses: Course[] = [
     title: "AI Strategy Intensive: From Clarity to Action",
     description: "A high-impact program designed to bridge the gap between AI theory and practical business execution.",
     duration: "2–3 weeks",
+    format: "self-paced + 1 live session",
     audience: "Professionals, Managers, Emerging Leaders",
     image: "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=800",
     price: 199,

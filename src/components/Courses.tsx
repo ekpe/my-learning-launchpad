@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from './ui/Button';
-import { Clock, Users, ArrowRight, Loader2 } from 'lucide-react';
+import { Clock, Users, ArrowRight, Loader2, MonitorPlay } from 'lucide-react';
 import { motion } from 'motion/react';
 import { courses as staticCourses } from '../data/courses';
 import { db } from '../firebase';
@@ -13,23 +13,25 @@ interface CourseCardProps {
   title: string;
   description: string;
   duration: string;
+  format?: string;
   audience: string;
   image: string;
   isFree?: boolean;
+  featured?: boolean;
 }
 
-const CourseCard: React.FC<CourseCardProps> = ({ id, title, description, duration, audience, image, isFree }) => {
+const CourseCard: React.FC<CourseCardProps> = ({ id, title, description, duration, format, audience, image, isFree, featured }) => {
   return (
     <motion.div 
       whileHover={{ y: -5 }}
-      className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col h-full relative"
+      className={`bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col ${featured ? 'md:flex-row' : 'h-full'} relative`}
     >
       {isFree && (
         <div className="absolute top-4 right-4 z-10 bg-green-600 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-lg">
           Free Course
         </div>
       )}
-      <div className="h-48 overflow-hidden relative">
+      <div className={`${featured ? 'md:w-2/5 h-64 md:h-auto' : 'h-48'} overflow-hidden relative`}>
         <img 
           src={image} 
           alt={title} 
@@ -40,15 +42,21 @@ const CourseCard: React.FC<CourseCardProps> = ({ id, title, description, duratio
           Executive Track
         </div>
       </div>
-      <div className="p-6 flex flex-col flex-grow">
-        <h4 className="text-xl font-bold text-slate-900 mb-3 leading-tight">{title}</h4>
+      <div className={`p-6 flex flex-col flex-grow ${featured ? 'md:p-10 md:w-3/5' : ''}`}>
+        <h4 className={`${featured ? 'text-2xl md:text-3xl' : 'text-xl'} font-bold text-slate-900 mb-3 leading-tight`}>{title}</h4>
         <p className="text-slate-600 text-sm mb-6 line-clamp-3 flex-grow">{description}</p>
         
-        <div className="space-y-3 mb-6">
+        <div className={`grid ${featured ? 'grid-cols-2 gap-4' : 'space-y-3'} mb-6`}>
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <Clock className="w-4 h-4 text-blue-900" />
             <span>{duration}</span>
           </div>
+          {format && (
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <MonitorPlay className="w-4 h-4 text-blue-900" />
+              <span>{format}</span>
+            </div>
+          )}
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <Users className="w-4 h-4 text-blue-900" />
             <span>{audience}</span>
@@ -56,7 +64,7 @@ const CourseCard: React.FC<CourseCardProps> = ({ id, title, description, duratio
         </div>
         
         <Link to={`/course/${id}`} className="mt-auto">
-          <Button variant="outline" className="w-full group">
+          <Button variant="outline" className={`${featured ? 'w-auto px-8' : 'w-full'} group`}>
             {isFree ? 'Enroll Now' : 'View Details'}
             <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Button>
@@ -67,21 +75,46 @@ const CourseCard: React.FC<CourseCardProps> = ({ id, title, description, duratio
 };
 
 export const Courses = () => {
-  const [displayCourses, setDisplayCourses] = useState<Course[]>(staticCourses);
+  const [displayCourses, setDisplayCourses] = useState<Course[]>(() => {
+    return [...staticCourses].sort((a, b) => {
+      if (a.isFree && !b.isFree) return -1;
+      if (!a.isFree && b.isFree) return 1;
+      return (a.order || 0) - (b.order || 0);
+    });
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'courses'), (snapshot) => {
+      let finalCourses = [...staticCourses];
+      
       if (!snapshot.empty) {
         const dbCourses = snapshot.docs.map(doc => doc.data() as Course);
-        // Sort: free courses first
-        const sorted = [...dbCourses].sort((a, b) => {
-          if (a.isFree && !b.isFree) return -1;
-          if (!a.isFree && b.isFree) return 1;
-          return (a.order || 0) - (b.order || 0);
+        
+        // Create a map of DB courses by ID for easy lookup
+        const dbMap = new Map(dbCourses.map(c => [c.id, c]));
+        
+        // Merge: DB courses override static ones if IDs match
+        // Also include DB courses that aren't in static
+        const mergedIds = new Set([...finalCourses.map(c => c.id), ...dbCourses.map(c => c.id)]);
+        
+        finalCourses = Array.from(mergedIds).map(id => {
+          const dbCourse = dbMap.get(id);
+          const staticCourse = staticCourses.find(c => c.id === id);
+          return dbCourse || staticCourse!;
         });
-        setDisplayCourses(sorted);
       }
+
+      // Sort: free courses first, then by order
+      const sorted = finalCourses.sort((a, b) => {
+        // Primary sort: Free courses first
+        if (a.isFree && !b.isFree) return -1;
+        if (!a.isFree && b.isFree) return 1;
+        // Secondary sort: Manual order
+        return (a.order || 0) - (b.order || 0);
+      });
+      
+      setDisplayCourses(sorted);
       setLoading(false);
     }, (error) => {
       console.error("Error fetching courses:", error);
@@ -108,19 +141,40 @@ export const Courses = () => {
             <Loader2 className="w-8 h-8 text-blue-900 animate-spin" />
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            {displayCourses.map((course) => (
-              <CourseCard 
-                key={course.id} 
-                id={course.id}
-                title={course.title}
-                description={course.description}
-                duration={course.duration}
-                audience={course.audience}
-                image={course.image}
-                isFree={course.isFree}
-              />
-            ))}
+          <div className="max-w-5xl mx-auto space-y-8">
+            {/* Top Course - Full Width */}
+            {displayCourses.length > 0 && (
+              <div className="w-full">
+                <CourseCard 
+                  id={displayCourses[0].id}
+                  title={displayCourses[0].title}
+                  description={displayCourses[0].description}
+                  duration={displayCourses[0].duration}
+                  format={displayCourses[0].format}
+                  audience={displayCourses[0].audience}
+                  image={displayCourses[0].image}
+                  isFree={displayCourses[0].isFree}
+                  featured={true}
+                />
+              </div>
+            )}
+
+            {/* Remaining Courses - 2 Column Grid */}
+            <div className="grid md:grid-cols-2 gap-8">
+              {displayCourses.slice(1).map((course) => (
+                <CourseCard 
+                  key={course.id} 
+                  id={course.id}
+                  title={course.title}
+                  description={course.description}
+                  duration={course.duration}
+                  format={course.format}
+                  audience={course.audience}
+                  image={course.image}
+                  isFree={course.isFree}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>

@@ -6,35 +6,55 @@ import Stripe from "stripe";
 import cors from "cors";
 import dotenv from "dotenv";
 import sgMail from "@sendgrid/mail";
-import admin from "firebase-admin";
-import fs from "fs";
+import * as admin from "firebase-admin";
+import { readFileSync } from "fs";
 
 dotenv.config();
 
-// Initialize Firebase Admin
-const firebaseConfig = JSON.parse(fs.readFileSync("./firebase-applet-config.json", "utf-8"));
-admin.initializeApp({
-  projectId: firebaseConfig.projectId,
-});
-
-const db = admin.firestore(firebaseConfig.firestoreDatabaseId);
-const auth = admin.auth();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
-
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-}
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  console.log("Starting server initialization...");
+
+  // Initialize Firebase Admin lazily
+  let db: admin.firestore.Firestore;
+  let auth: admin.auth.Auth;
+
+  try {
+    const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+    const firebaseConfig = JSON.parse(readFileSync(configPath, "utf-8"));
+    
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        projectId: firebaseConfig.projectId,
+      });
+    }
+    
+    db = admin.firestore(firebaseConfig.firestoreDatabaseId);
+    auth = admin.auth();
+    console.log("Firebase Admin initialized successfully");
+  } catch (error) {
+    console.error("Failed to initialize Firebase Admin:", error);
+    // We don't exit here to allow the server to start and show errors in the UI
+  }
+
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
+
+  if (process.env.SENDGRID_API_KEY) {
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  }
+
   app.use(cors());
   app.use(express.json());
+
+  // Health check route - MUST be before any other routes
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
 
   // Admin middleware
   const verifyAdmin = async (req: any, res: any, next: any) => {
@@ -45,6 +65,9 @@ async function startServer() {
 
     const idToken = authHeader.split("Bearer ")[1];
     try {
+      if (!auth || !db) {
+        throw new Error("Firebase Admin not initialized");
+      }
       const decodedToken = await auth.verifyIdToken(idToken);
       const userDoc = await db.collection("users").doc(decodedToken.uid).get();
       const userData = userDoc.data();
@@ -93,7 +116,7 @@ async function startServer() {
         },
       });
 
-      res.json({ id: session.id });
+      res.json({ id: session.id, url: session.url });
     } catch (error: any) {
       console.error("Stripe error:", error);
       res.status(500).json({ error: error.message });
@@ -195,11 +218,17 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
+    console.log("Initializing Vite middleware...");
+    try {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+      console.log("Vite middleware initialized");
+    } catch (error) {
+      console.error("Failed to initialize Vite middleware:", error);
+    }
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
@@ -208,9 +237,15 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  try {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://0.0.0.0:${PORT}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+  }
 }
 
-startServer();
+startServer().catch((error) => {
+  console.error("Fatal error during server startup:", error);
+});

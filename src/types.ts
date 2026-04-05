@@ -13,6 +13,7 @@ export interface Course {
   title: string;
   description: string;
   duration: string;
+  format?: string;
   audience: string;
   image: string;
   isFree?: boolean;

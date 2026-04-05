@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Link } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
+import { LeadMagnetHero } from './components/LeadMagnetHero';
 import { About } from './components/About';
 import { Courses } from './components/Courses';
 import { WhyUs } from './components/WhyUs';
@@ -39,6 +40,7 @@ const ScrollToTop = () => {
 
 const HomePage = () => (
   <main>
+    <LeadMagnetHero />
     <Hero />
     <About />
     <Courses />
