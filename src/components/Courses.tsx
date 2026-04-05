@@ -77,8 +77,10 @@ const CourseCard: React.FC<CourseCardProps> = ({ id, title, description, duratio
 export const Courses = () => {
   const [displayCourses, setDisplayCourses] = useState<Course[]>(() => {
     return [...staticCourses].sort((a, b) => {
-      if (a.isFree && !b.isFree) return -1;
-      if (!a.isFree && b.isFree) return 1;
+      const aFree = !!a.isFree;
+      const bFree = !!b.isFree;
+      if (aFree && !bFree) return -1;
+      if (!aFree && bFree) return 1;
       return (a.order || 0) - (b.order || 0);
     });
   });
@@ -101,19 +103,39 @@ export const Courses = () => {
         finalCourses = Array.from(mergedIds).map(id => {
           const dbCourse = dbMap.get(id);
           const staticCourse = staticCourses.find(c => c.id === id);
-          return dbCourse || staticCourse!;
+          
+          if (dbCourse && staticCourse) {
+            // Merge: prefer static for order and isFree to ensure layout intent
+            return {
+              ...dbCourse,
+              order: staticCourse.order,
+              isFree: staticCourse.isFree
+            };
+          }
+          
+          if (dbCourse) {
+            // For courses only in DB, ensure they have a high order so they don't displace static ones
+            return {
+              ...dbCourse,
+              order: (dbCourse.order && dbCourse.order > 10) ? dbCourse.order : 100,
+              isFree: !!dbCourse.isFree
+            };
+          }
+          
+          return staticCourse!;
         });
       }
 
       // Sort: free courses first, then by order
       const sorted = finalCourses.sort((a, b) => {
-        // Primary sort: Free courses first
-        if (a.isFree && !b.isFree) return -1;
-        if (!a.isFree && b.isFree) return 1;
-        // Secondary sort: Manual order
+        const aFree = !!a.isFree;
+        const bFree = !!b.isFree;
+        if (aFree && !bFree) return -1;
+        if (!aFree && bFree) return 1;
         return (a.order || 0) - (b.order || 0);
       });
       
+      console.log('Courses sorted for display:', sorted.map(c => ({ id: c.id, order: c.order, isFree: c.isFree })));
       setDisplayCourses(sorted);
       setLoading(false);
     }, (error) => {

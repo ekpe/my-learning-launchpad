@@ -149,6 +149,7 @@ export const courses: Course[] = [
     audience: "Chief Strategy Officers, VPs, Directors",
     image: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=800",
     price: 499,
+    isFree: false,
     order: 3,
     fullDescription: "Become a certified AI strategist. This intensive program equips you with the tools and frameworks needed to design and lead enterprise-wide AI transformations. You will work on real-world case studies and develop a comprehensive AI roadmap for your organization.",
     curriculum: [
@@ -186,6 +187,7 @@ export const courses: Course[] = [
     audience: "COOs, CTOs, Implementation Leads",
     image: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=800",
     price: 799,
+    isFree: false,
     order: 4,
     fullDescription: "Bridging the gap between strategy and execution. This course focuses on the operational realities of AI implementation. We cover data infrastructure, model deployment, monitoring, and the critical human element of AI adoption.",
     curriculum: [
@@ -223,6 +225,7 @@ export const courses: Course[] = [
     audience: "Forward-thinking CEOs, Innovation Leaders",
     image: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&q=80&w=800",
     price: 999,
+    isFree: false,
     order: 5,
     fullDescription: "The next frontier of AI is agentic. This course explores the transition from AI as a tool to AI as an autonomous agent. We discuss the strategic implications of multi-agent systems, autonomous workflows, and the evolving role of human leadership in an agentic world.",
     curriculum: [
