@@ -24,7 +24,9 @@ import {
   Trash2,
   Plus,
   RefreshCw,
+  CheckCircle,
   CheckCircle2,
+  X,
   XCircle,
   AlertCircle,
   Loader2
@@ -60,6 +62,7 @@ export const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [showCourseForm, setShowCourseForm] = useState(false);
   const [showUserForm, setShowUserForm] = useState(false);
   const [newUser, setNewUser] = useState({
@@ -68,6 +71,13 @@ export const AdminDashboard: React.FC = () => {
     displayName: '',
     role: 'STUDENT' as 'ADMIN' | 'INSTRUCTOR' | 'STUDENT'
   });
+
+  useEffect(() => {
+    if (status) {
+      const timer = setTimeout(() => setStatus(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [status]);
   const [newCourse, setNewCourse] = useState({
     title: '',
     description: '',
@@ -86,6 +96,9 @@ export const AdminDashboard: React.FC = () => {
     const usersUnsub = onSnapshot(collection(db, 'users'), (snapshot) => {
       const usersData = snapshot.docs.map(doc => doc.data() as UserProfile);
       setUsers(usersData);
+    }, (error) => {
+      console.error('Firestore users subscription error:', error);
+      setStatus({ type: 'error', message: 'Failed to load users. Check permissions.' });
     });
 
     // Subscribe to enrollments
@@ -148,19 +161,21 @@ export const AdminDashboard: React.FC = () => {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to update role');
+        const message = error.details ? `${error.error}: ${error.details}` : (error.error || 'Failed to update role');
+        throw new Error(message);
       }
       
-      alert('Role updated successfully!');
+      setStatus({ type: 'success', message: 'Role updated successfully!' });
     } catch (error: any) {
       console.error('Error updating role:', error);
-      alert(error.message || 'Failed to update role. Check permissions.');
+      setStatus({ type: 'error', message: error.message || 'Failed to update role.' });
     }
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setSyncing(true);
+    setStatus(null);
     try {
       const idToken = await auth.currentUser?.getIdToken();
       const response = await fetch('/api/admin/create-user', {
@@ -174,7 +189,8 @@ export const AdminDashboard: React.FC = () => {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to create user');
+        const message = error.details ? `${error.error}: ${error.details}` : (error.error || 'Failed to create user');
+        throw new Error(message);
       }
 
       setShowUserForm(false);
@@ -184,10 +200,10 @@ export const AdminDashboard: React.FC = () => {
         displayName: '',
         role: 'STUDENT'
       });
-      alert('User created successfully!');
+      setStatus({ type: 'success', message: 'User created successfully!' });
     } catch (error: any) {
       console.error('Error creating user:', error);
-      alert(error.message || 'Failed to create user.');
+      setStatus({ type: 'error', message: error.message || 'Failed to create user.' });
     } finally {
       setSyncing(false);
     }
@@ -197,6 +213,7 @@ export const AdminDashboard: React.FC = () => {
     if (!window.confirm('Are you sure you want to delete this user? This cannot be undone.')) return;
     
     setSyncing(true);
+    setStatus(null);
     try {
       const idToken = await auth.currentUser?.getIdToken();
       const response = await fetch(`/api/admin/users/${userId}`, {
@@ -208,13 +225,14 @@ export const AdminDashboard: React.FC = () => {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to delete user');
+        const message = error.details ? `${error.error}: ${error.details}` : (error.error || 'Failed to delete user');
+        throw new Error(message);
       }
 
-      alert('User deleted successfully!');
+      setStatus({ type: 'success', message: 'User deleted successfully!' });
     } catch (error: any) {
       console.error('Error deleting user:', error);
-      alert(error.message || 'Failed to delete user.');
+      setStatus({ type: 'error', message: error.message || 'Failed to delete user.' });
     } finally {
       setSyncing(false);
     }
@@ -222,6 +240,7 @@ export const AdminDashboard: React.FC = () => {
 
   const syncCourses = async () => {
     setSyncing(true);
+    setStatus(null);
     try {
       for (const course of staticCourses) {
         await setDoc(doc(db, 'courses', course.id), {
@@ -229,10 +248,10 @@ export const AdminDashboard: React.FC = () => {
           createdAt: serverTimestamp()
         }, { merge: true });
       }
-      alert('Courses synced successfully!');
+      setStatus({ type: 'success', message: 'Courses synced successfully!' });
     } catch (error) {
       console.error('Error syncing courses:', error);
-      alert('Failed to sync courses.');
+      setStatus({ type: 'error', message: 'Failed to sync courses.' });
     } finally {
       setSyncing(false);
     }
@@ -241,6 +260,7 @@ export const AdminDashboard: React.FC = () => {
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     setSyncing(true);
+    setStatus(null);
     try {
       const id = newCourse.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       await setDoc(doc(db, 'courses', id), {
@@ -261,10 +281,10 @@ export const AdminDashboard: React.FC = () => {
         isFree: false,
         order: 10
       });
-      alert('Course created successfully!');
+      setStatus({ type: 'success', message: 'Course created successfully!' });
     } catch (error) {
       console.error('Error creating course:', error);
-      alert('Failed to create course.');
+      setStatus({ type: 'error', message: 'Failed to create course.' });
     } finally {
       setSyncing(false);
     }
@@ -303,6 +323,28 @@ export const AdminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 pt-24 pb-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
+        {status && (
+          <div className={`mb-6 p-4 rounded-xl flex items-center justify-between border animate-in fade-in slide-in-from-top-4 duration-300 ${
+            status.type === 'success' 
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+              : 'bg-rose-50 text-rose-800 border-rose-200'
+          }`}>
+            <div className="flex items-center gap-3">
+              {status.type === 'success' ? (
+                <CheckCircle className="w-5 h-5 text-emerald-500" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-rose-500" />
+              )}
+              <p className="font-medium">{status.message}</p>
+            </div>
+            <button 
+              onClick={() => setStatus(null)}
+              className="p-1 hover:bg-black/5 rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Admin Dashboard</h1>

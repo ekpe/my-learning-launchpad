@@ -6,7 +6,9 @@ import Stripe from "stripe";
 import cors from "cors";
 import dotenv from "dotenv";
 import sgMail from "@sendgrid/mail";
-import * as admin from "firebase-admin";
+import { initializeApp, getApps, getApp, App } from "firebase-admin/app";
+import { getAuth, Auth } from "firebase-admin/auth";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { readFileSync } from "fs";
 
 dotenv.config();
@@ -21,45 +23,45 @@ async function startServer() {
   console.log("Starting server initialization...");
 
   // Initialize Firebase Admin
-  let db: admin.firestore.Firestore;
-  let auth: admin.auth.Auth;
+  let db: any;
+  let auth: Auth;
+  let initError: any = null;
 
   try {
     const configPath = path.join(process.cwd(), "firebase-applet-config.json");
     console.log(`Reading config from: ${configPath}`);
     const firebaseConfig = JSON.parse(readFileSync(configPath, "utf-8"));
-    console.log(`Project ID: ${firebaseConfig.projectId}`);
-    console.log(`Database ID: ${firebaseConfig.firestoreDatabaseId}`);
     
-    // In this environment, we should try to initialize without arguments first
-    // as the environment variables are usually pre-configured.
-    if (!admin.apps.length) {
-      try {
-        admin.initializeApp();
-        console.log("Firebase Admin app initialized with default credentials");
-      } catch (initError) {
-        console.warn("Default initialization failed, trying with projectId:", initError);
-        admin.initializeApp({
-          projectId: firebaseConfig.projectId,
-        });
-        console.log("Firebase Admin app initialized with projectId");
-      }
+    const projectId = firebaseConfig.projectId;
+    console.log(`Initializing Firebase Admin for project: ${projectId}`);
+    
+    let firebaseApp: App;
+    
+    if (getApps().length === 0) {
+      // Explicitly set the project ID from the config
+      firebaseApp = initializeApp({
+        projectId: projectId,
+      });
+      console.log("Firebase Admin initialized successfully with projectId");
     } else {
-      console.log(`Firebase Admin already has ${admin.apps.length} apps initialized`);
+      firebaseApp = getApp();
+      console.log("Using existing Firebase Admin app");
     }
     
-    auth = admin.auth();
+    auth = getAuth(firebaseApp);
     
-    // Use the specific database ID if provided
+    // Handle named database if present
     if (firebaseConfig.firestoreDatabaseId) {
-      db = admin.firestore(firebaseConfig.firestoreDatabaseId);
+      console.log(`Connecting to Firestore database: ${firebaseConfig.firestoreDatabaseId}`);
+      db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
     } else {
-      db = admin.firestore();
+      db = getFirestore(firebaseApp);
     }
     
-    console.log("Firebase Admin services (Auth & Firestore) initialized");
-  } catch (error) {
-    console.error("CRITICAL: Failed to initialize Firebase Admin:", error);
+    console.log("Firebase Admin services (Auth & Firestore) ready");
+  } catch (error: any) {
+    initError = error;
+    console.error("CRITICAL: Firebase Admin initialization failed:", error);
   }
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
@@ -80,27 +82,60 @@ async function startServer() {
   const verifyAdmin = async (req: any, res: any, next: any) => {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Unauthorized" });
+      return res.status(401).json({ error: "Unauthorized: Missing or invalid authorization header" });
     }
 
     const idToken = authHeader.split("Bearer ")[1];
     try {
       if (!auth || !db) {
-        throw new Error("Firebase Admin not initialized");
+        console.error("verifyAdmin: Firebase Admin services not initialized. Error:", initError?.message);
+        return res.status(500).json({ 
+          error: "Server error: Firebase Admin not initialized",
+          details: initError?.message || "Unknown initialization error"
+        });
       }
-      const decodedToken = await auth.verifyIdToken(idToken);
-      const userDoc = await db.collection("users").doc(decodedToken.uid).get();
-      const userData = userDoc.data();
-
-      if (userData?.role !== "ADMIN") {
-        return res.status(403).json({ error: "Forbidden: Admin access required" });
+      
+      console.log("verifyAdmin: Verifying ID token...");
+      let decodedToken;
+      try {
+        decodedToken = await auth.verifyIdToken(idToken);
+      } catch (authError: any) {
+        console.error("verifyAdmin: Token verification failed:", authError.message);
+        return res.status(401).json({ error: `Invalid token: ${authError.message}` });
       }
 
-      req.user = decodedToken;
-      next();
-    } catch (error) {
-      console.error("Auth error:", error);
-      res.status(401).json({ error: "Invalid token" });
+      console.log(`verifyAdmin: Decoded token for UID: ${decodedToken.uid}, Email: ${decodedToken.email}`);
+      
+      // Hardcoded admin email check to match firestore.rules
+      const isAdminEmail = decodedToken.email === "ekpe.okorafor@gmail.com";
+      
+      if (isAdminEmail) {
+        console.log(`verifyAdmin: Access granted to primary admin email: ${decodedToken.email}`);
+        req.user = decodedToken;
+        return next();
+      }
+
+      // If not primary admin, check Firestore for role
+      try {
+        const userDoc = await db.collection("users").doc(decodedToken.uid).get();
+        const userData = userDoc.data();
+        const hasAdminRole = userData?.role === "ADMIN";
+
+        if (!hasAdminRole) {
+          console.warn(`verifyAdmin: User ${decodedToken.uid} (${decodedToken.email}) is not an admin. Role: ${userData?.role}`);
+          return res.status(403).json({ error: "Forbidden: Admin access required" });
+        }
+
+        console.log(`verifyAdmin: Access granted to ${decodedToken.email} (HasAdminRole: ${hasAdminRole})`);
+        req.user = decodedToken;
+        next();
+      } catch (dbError: any) {
+        console.error("verifyAdmin: Firestore read error:", dbError.message);
+        return res.status(500).json({ error: `Database error during verification: ${dbError.message}` });
+      }
+    } catch (error: any) {
+      console.error("verifyAdmin: Unexpected error:", error.message);
+      res.status(500).json({ error: `Unexpected server error: ${error.message}` });
     }
   };
 
@@ -170,22 +205,33 @@ async function startServer() {
   app.post("/api/admin/create-user", verifyAdmin, async (req, res) => {
     try {
       const { email, password, displayName, role } = req.body;
+      console.log(`API: create-user request for ${email}, role: ${role}`);
+      
+      if (!auth || !db) {
+        throw new Error("Firebase Admin services not initialized");
+      }
 
+      console.log("API: Creating auth record...");
       const userRecord = await auth.createUser({
         email,
         password,
         displayName,
       });
+      console.log(`API: Auth record created with UID: ${userRecord.uid}`);
 
+      console.log("API: Creating Firestore record...");
       await db.collection("users").doc(userRecord.uid).set({
+        uid: userRecord.uid,
         email,
         displayName,
         role: role || "STUDENT",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
       });
+      console.log("API: Firestore record created successfully");
 
       res.json({ uid: userRecord.uid });
     } catch (error: any) {
+      console.error("API: create-user error:", error);
       res.status(500).json({ error: error.message });
     }
   });

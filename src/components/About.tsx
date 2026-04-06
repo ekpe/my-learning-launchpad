@@ -18,7 +18,7 @@ export const About = () => {
                   referrerPolicy="no-referrer"
                 />
               </div>
-              <div className="absolute -bottom-8 -right-8 bg-white p-6 rounded-2xl shadow-xl border border-slate-100 max-w-[240px]">
+              <div className="relative lg:absolute mt-8 lg:mt-0 lg:-bottom-8 lg:-right-8 bg-white p-6 rounded-2xl shadow-xl border border-slate-100 max-w-[280px] lg:max-w-[240px] mx-auto lg:mx-0">
                 <p className="text-slate-600 text-sm italic mb-4">
                   "AI is not just a technology shift; it's a fundamental change in how we create value and lead organizations."
                 </p>

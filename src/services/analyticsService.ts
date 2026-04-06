@@ -55,8 +55,12 @@ export const logEvent = async (event: AnalyticsEvent, metadata?: Record<string, 
     }
 
     const cleanData = stripUndefined(analyticsData);
+    console.log('Logging analytics event:', event, cleanData);
     await addDoc(collection(db, 'analytics'), cleanData);
-  } catch (error) {
-    console.error('Error logging analytics event:', error);
+  } catch (error: any) {
+    console.error('Error logging analytics event:', event, error);
+    if (error.code === 'permission-denied') {
+      console.error('Permission denied for analytics event. Current user:', auth.currentUser?.uid);
+    }
   }
 };
