@@ -88,6 +88,7 @@ export const AdminDashboard: React.FC = () => {
   const [showUserForm, setShowUserForm] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [serverConfig, setServerConfig] = useState<{ ok: boolean; checks: Record<string, boolean>; firebaseAdminError?: string } | null>(null);
   const [newUser, setNewUser] = useState({
     email: '',
     password: '',
@@ -113,6 +114,14 @@ export const AdminDashboard: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [status]);
+
+  // Check server config on mount so admin can see missing env vars immediately
+  useEffect(() => {
+    fetch('/api/config-check')
+      .then(r => r.json())
+      .then(data => setServerConfig(data))
+      .catch(() => {}); // non-fatal
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -625,6 +634,34 @@ export const AdminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 pt-24 pb-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
+
+        {/* Server config warning — shows missing env vars */}
+        {serverConfig && !serverConfig.ok && (
+          <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+            <p className="font-bold mb-2">⚠️ Server configuration incomplete — some admin features will not work.</p>
+            <ul className="space-y-1 list-disc list-inside">
+              {!serverConfig.checks.firebaseAdmin && (
+                <li>
+                  <strong>Firebase Admin SDK not initialised</strong> — set <code className="bg-amber-100 px-1 rounded">FIREBASE_SERVICE_ACCOUNT_KEY</code> in Vercel → Project Settings → Environment Variables.
+                  {serverConfig.firebaseAdminError && (
+                    <span className="block mt-1 text-xs text-amber-700 font-mono">{serverConfig.firebaseAdminError}</span>
+                  )}
+                </li>
+              )}
+              {!serverConfig.checks.adminEmail && (
+                <li>
+                  <code className="bg-amber-100 px-1 rounded">ADMIN_EMAIL</code> not set — admin role checks may fail.
+                </li>
+              )}
+              {!serverConfig.checks.firestoreDbId && (
+                <li>
+                  <code className="bg-amber-100 px-1 rounded">FIRESTORE_DATABASE_ID</code> not set — using default Firestore database.
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+
         {status && (
           <div className={`mb-6 p-4 rounded-xl flex items-center justify-between border animate-in fade-in slide-in-from-top-4 duration-300 ${
             status.type === 'success' 

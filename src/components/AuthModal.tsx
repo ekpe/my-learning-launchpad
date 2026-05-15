@@ -84,8 +84,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setLoading(true);
     try {
       const { user } = await signInWithPopup(auth, new GoogleAuthProvider());
-      await upsertProfile(user.uid, user.displayName, user.email);
+      // Close immediately — user is authenticated. Upsert profile in background.
       handleClose();
+      upsertProfile(user.uid, user.displayName, user.email)
+        .catch(err => console.error('[AuthModal] Google profile upsert failed:', err));
     } catch (err: any) {
       if (err.code !== 'auth/popup-closed-by-user') {
         setError(friendlyError(err.code));
@@ -103,15 +105,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
-        // Login done — close immediately. Profile is fetched in the background by AuthContext.
         handleClose();
       } else {
         // Registration
         const { user } = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(user, { displayName: name });
-        await upsertProfile(user.uid, name, email);
-
-        // Send welcome email — fire and forget, don't block close
+        // Close immediately — user is authenticated
+        handleClose();
+        // Profile write and welcome email in background — never block close
+        upsertProfile(user.uid, name, email)
+          .catch(err => console.error('[AuthModal] Profile upsert failed:', err));
         sendEmail({
           to: email,
           subject: 'Welcome to My Learning Launchpad!',
@@ -129,17 +132,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               <p>Best regards,<br/>The My Learning Launchpad Team</p>
             </div>
           `,
-        }).catch((err) => console.error('[AuthModal] Welcome email failed:', err));
-
-        handleClose();
+        }).catch(err => console.error('[AuthModal] Welcome email failed:', err));
       }
     } catch (err: any) {
       console.error('[AuthModal] Auth error:', err);
       setError(friendlyError(err.code));
+    } finally {
       setLoading(false);
     }
-    // Note: no finally setLoading(false) on success path —
-    // handleClose() unmounts the component, which is fine.
+    // Note: handleClose() unmounts the component on success which is fine —
+    // the finally setLoading(false) is a no-op on unmounted components in React 18.
   };
 
   return (
