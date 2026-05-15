@@ -206,6 +206,28 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleSyncUsers = async () => {
+    setSyncing(true);
+    setStatus(null);
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch('/api/admin/sync-users', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+      const data = await safeJson(response);
+      if (!response.ok) throw new Error(data.error || 'Sync failed');
+      setStatus({
+        type: 'success',
+        message: `Sync complete — ${data.created} user${data.created !== 1 ? 's' : ''} added, ${data.skipped} already existed.${data.errors ? ` ${data.errors.length} error(s).` : ''}`
+      });
+    } catch (error: any) {
+      setStatus({ type: 'error', message: error.message || 'Sync failed.' });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setSyncing(true);
@@ -701,13 +723,25 @@ export const AdminDashboard: React.FC = () => {
               />
             </div>
             {activeTab === 'users' && (
-              <Button 
-                onClick={() => setShowUserForm(true)}
-                className="rounded-xl flex items-center gap-2 bg-blue-900 hover:bg-blue-800"
-              >
-                <Plus className="w-4 h-4" />
-                New User
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleSyncUsers}
+                  disabled={syncing}
+                  className="rounded-xl flex items-center gap-2 border-slate-200"
+                  title="Sync Firebase Auth users into Firestore"
+                >
+                  {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                  Sync Auth Users
+                </Button>
+                <Button
+                  onClick={() => setShowUserForm(true)}
+                  className="rounded-xl flex items-center gap-2 bg-blue-900 hover:bg-blue-800"
+                >
+                  <Plus className="w-4 h-4" />
+                  New User
+                </Button>
+              </div>
             )}
             {activeTab === 'courses' && (
               <div className="flex items-center gap-2">

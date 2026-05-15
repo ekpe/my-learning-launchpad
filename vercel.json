@@ -15,6 +15,7 @@
     { "source": "/api/admin/update-user-role", "destination": "/api/admin/update-user-role" },
     { "source": "/api/admin/users/:uid", "destination": "/api/admin/delete-user?uid=:uid" },
     { "source": "/api/admin/upload", "destination": "/api/admin/upload" },
+    { "source": "/api/admin/sync-users", "destination": "/api/admin/sync-users" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
