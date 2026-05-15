@@ -12,3 +12,4 @@ firebase-applet-config.json
 
 # Uploaded files (use cloud storage in prod)
 uploads/
+.env.local

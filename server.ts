@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 import Stripe from "stripe";
 import cors from "cors";
 import dotenv from "dotenv";
-import sgMail from "@sendgrid/mail";
+import { Resend } from "resend";
 import { initializeApp, getApps, getApp, App } from "firebase-admin/app";
 import { getAuth, Auth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
@@ -121,11 +121,13 @@ async function startServer() {
     console.error("CRITICAL: Firebase Admin initialization failed:", error);
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
+  const stripe = process.env.STRIPE_SECRET_KEY
+    ? new Stripe(process.env.STRIPE_SECRET_KEY)
+    : null;
+  if (!stripe) console.warn("[server] STRIPE_SECRET_KEY not set — payment routes disabled");
 
-  if (process.env.SENDGRID_API_KEY) {
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-  }
+  const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+  if (!resend) console.warn("[server] RESEND_API_KEY not set — email routes disabled");
 
   app.use(cors());
   app.use(express.json());
@@ -201,6 +203,7 @@ async function startServer() {
 
   // Stripe webhook — must use raw body, registered BEFORE express.json()
   app.post("/api/stripe-webhook", express.raw({ type: "application/json" }), async (req, res) => {
+    if (!stripe) return res.status(503).json({ error: "Stripe not configured" });
     const sig = req.headers["stripe-signature"];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -247,8 +250,8 @@ async function startServer() {
     try {
       const { courseId, courseName, price, userId } = req.body;
 
-      if (!process.env.STRIPE_SECRET_KEY) {
-        return res.status(500).json({ error: "Stripe secret key not configured" });
+      if (!stripe) {
+        return res.status(503).json({ error: "Stripe not configured — set STRIPE_SECRET_KEY" });
       }
 
       const session = await stripe.checkout.sessions.create({
@@ -521,37 +524,25 @@ async function startServer() {
     try {
       const { to, subject, text, html, from } = req.body;
 
-      if (!process.env.SENDGRID_API_KEY) {
-        console.warn("[Email] SendGrid API key NOT configured. Email was skipped.");
-        return res.status(200).json({ 
-          status: "skipped", 
-          message: "SendGrid API key not found in environment variables. Please add it to your Secrets." 
-        });
+      if (!resend) {
+        console.warn("[Email] RESEND_API_KEY not configured — skipping");
+        return res.status(200).json({ status: "skipped", message: "Email service not configured" });
       }
 
-      const fromEmail = from || process.env.SENDGRID_FROM_EMAIL || "info@mylearninglaunchpad.com";
-      
-      const msg = {
-        to,
-        from: fromEmail,
-        subject,
-        text,
-        html,
-      };
+      const fromEmail = from || process.env.RESEND_FROM_EMAIL || "info@mylearninglaunchpad.com";
 
-      console.log(`[Email] Attempting to send email to ${to} with subject: ${subject}`);
-      await sgMail.send(msg);
-      console.log(`[Email] Success! Email sent to ${to}`);
-      res.json({ status: "success" });
+      const { data, error } = await resend.emails.send({ from: fromEmail, to, subject, text, html });
+
+      if (error) {
+        console.error("[Email] Resend error:", error);
+        return res.status(500).json({ error: error.message });
+      }
+
+      console.log(`[Email] Sent to ${to}: ${subject} (id: ${data?.id})`);
+      res.json({ status: "success", id: data?.id });
     } catch (error: any) {
-      console.error("[Email] SendGrid Error:", error);
-      if (error.response) {
-        console.error("[Email] SendGrid Response Body:", JSON.stringify(error.response.body, null, 2));
-      }
-      res.status(500).json({ 
-        error: error.message,
-        details: error.response?.body || "Check server logs for full details"
-      });
+      console.error("[Email] Unexpected error:", error.message);
+      res.status(500).json({ error: error.message });
     }
   });
 
