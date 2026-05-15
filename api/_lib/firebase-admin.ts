@@ -1,8 +1,3 @@
-/**
- * Shared Firebase Admin initialisation.
- * Vercel may reuse the Node.js process across invocations, so we guard
- * against double-initialisation with getApps().
- */
 import { initializeApp, getApps, getApp, cert, App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
@@ -10,25 +5,53 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 export function getAdminApp(): App {
   if (getApps().length > 0) return getApp();
 
-  // Prefer a service-account JSON stored as an env var (recommended for Vercel).
-  // Fall back to Application Default Credentials (works locally with `firebase login`).
   if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-    return initializeApp({ credential: cert(serviceAccount) });
+    try {
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+      return initializeApp({ credential: cert(serviceAccount) });
+    } catch (e: any) {
+      throw new Error(
+        `FIREBASE_SERVICE_ACCOUNT_KEY is set but could not be parsed as JSON: ${e.message}. ` +
+        `Make sure the value in Vercel is the full service account JSON on a single line.`
+      );
+    }
   }
 
-  // ADC / emulator / Cloud Run
-  return initializeApp({
-    projectId: process.env.FIREBASE_PROJECT_ID,
-  });
+  // Fallback: project ID only (works for Firestore reads with open rules, not Auth admin ops)
+  const projectId =
+    process.env.FIREBASE_PROJECT_ID ||
+    process.env.VITE_FIREBASE_PROJECT_ID;
+
+  if (!projectId) {
+    throw new Error(
+      "Firebase Admin SDK not configured. " +
+      "Set FIREBASE_SERVICE_ACCOUNT_KEY in your Vercel environment variables. " +
+      "Get it from Firebase Console → Project Settings → Service Accounts → Generate new private key."
+    );
+  }
+
+  console.warn(
+    "[firebase-admin] No FIREBASE_SERVICE_ACCOUNT_KEY found — falling back to project ID only. " +
+    "Auth admin operations (createUser, verifyIdToken) will fail."
+  );
+  return initializeApp({ projectId });
 }
 
-const app = getAdminApp();
+export let db: ReturnType<typeof getFirestore>;
+export let auth: ReturnType<typeof getAuth>;
+export let adminInitError: string | null = null;
 
-const firestoreDatabaseId = process.env.FIRESTORE_DATABASE_ID;
-export const db = firestoreDatabaseId
-  ? getFirestore(app, firestoreDatabaseId)
-  : getFirestore(app);
+try {
+  const app = getAdminApp();
+  const dbId = process.env.FIRESTORE_DATABASE_ID;
+  db = dbId ? getFirestore(app, dbId) : getFirestore(app);
+  auth = getAuth(app);
+} catch (e: any) {
+  adminInitError = e.message;
+  console.error("[firebase-admin] Initialization failed:", e.message);
+  // Assign dummies so imports don't crash — handlers must check adminInitError
+  db = null as any;
+  auth = null as any;
+}
 
-export const auth = getAuth(app);
 export { FieldValue };

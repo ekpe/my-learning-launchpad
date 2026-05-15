@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { auth, db } from "./firebase-admin";
+import { auth, db, adminInitError } from "./firebase-admin";
 
 export type AdminHandler = (
   req: VercelRequest,
@@ -7,12 +7,17 @@ export type AdminHandler = (
   uid: string
 ) => Promise<void>;
 
-/**
- * Wraps a handler, verifying the Bearer token and checking for ADMIN role.
- * Usage: export default withAdmin(async (req, res, uid) => { ... })
- */
 export function withAdmin(handler: AdminHandler) {
   return async (req: VercelRequest, res: VercelResponse) => {
+    // Return a clear JSON error if Admin SDK failed to init (missing service account key)
+    if (adminInitError) {
+      return res.status(503).json({
+        error: "Server configuration error",
+        details: adminInitError,
+        hint: "Set FIREBASE_SERVICE_ACCOUNT_KEY in Vercel → Project Settings → Environment Variables",
+      });
+    }
+
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith("Bearer ")) {
       return res.status(401).json({ error: "Unauthorized: missing Bearer token" });
@@ -27,13 +32,13 @@ export function withAdmin(handler: AdminHandler) {
       return res.status(401).json({ error: `Invalid token: ${err.message}` });
     }
 
-    // Primary admin via env var (no DB read required — fast path)
+    // Fast path: env-var admin check (no DB read)
     const adminEmail = process.env.ADMIN_EMAIL;
     if (adminEmail && decodedToken.email === adminEmail) {
       return handler(req, res, decodedToken.uid);
     }
 
-    // Fallback: check Firestore role
+    // Fallback: Firestore role check
     try {
       const userDoc = await db.collection("users").doc(decodedToken.uid).get();
       if (userDoc.data()?.role !== "ADMIN") {

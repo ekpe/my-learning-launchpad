@@ -57,6 +57,22 @@ import {
 
 type AdminTab = 'users' | 'courses' | 'enrollments' | 'analytics';
 
+// Safely parse API responses — Vercel can return HTML error pages on 500s
+async function safeJson(response: Response): Promise<any> {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    // HTML or plain-text error from Vercel/server
+    const snippet = text.slice(0, 200);
+    throw new Error(
+      response.ok
+        ? `Unexpected server response: ${snippet}`
+        : `Server error ${response.status}: ${snippet}`
+    );
+  }
+}
+
 export const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -169,7 +185,7 @@ export const AdminDashboard: React.FC = () => {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await safeJson(response);
         const message = error.details ? `${error.error}: ${error.details}` : (error.error || 'Failed to update role');
         throw new Error(message);
       }
@@ -197,7 +213,7 @@ export const AdminDashboard: React.FC = () => {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await safeJson(response);
         const message = error.details ? `${error.error}: ${error.details}` : (error.error || 'Failed to create user');
         throw new Error(message);
       }
@@ -231,7 +247,7 @@ export const AdminDashboard: React.FC = () => {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await safeJson(response);
         const message = error.details ? `${error.error}: ${error.details}` : (error.error || 'Failed to delete user');
         throw new Error(message);
       }
@@ -266,7 +282,7 @@ export const AdminDashboard: React.FC = () => {
         throw new Error('Failed to upload file');
       }
 
-      const data = await response.json();
+      const data = await safeJson(response);
       return data.url;
     } catch (error: any) {
       console.error('Upload error:', error);
