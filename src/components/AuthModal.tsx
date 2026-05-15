@@ -63,6 +63,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+    let succeeded = false;
 
     try {
       if (isLogin) {
@@ -133,12 +134,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
         }
       }
-      onClose();
+      succeeded = true;
     } catch (err: any) {
       console.error("Auth error:", err);
       setError(err.message || 'An error occurred during authentication.');
     } finally {
       setLoading(false);
+      if (succeeded) onClose();
     }
   };
 
