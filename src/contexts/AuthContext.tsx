@@ -3,7 +3,6 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { UserProfile } from '../types';
-import { handleFirestoreError, OperationType } from '../lib/firestore-errors';
 
 interface AuthContextType {
   user: User | null;
@@ -20,52 +19,54 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  // loading is only true during the *initial* auth check, not on every login
+  // loading is ONLY true during the very first auth check on page load.
+  // It never goes back to true after that — login/logout don't trigger a full-page spinner.
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let unsubscribeProfile: (() => void) | undefined;
+    let profileUnsub: (() => void) | undefined;
 
-    // Safety net: never block the UI for more than 5 seconds
-    const timeout = setTimeout(() => setLoading(false), 5000);
+    // Safety net: unblock the UI after 4s no matter what
+    const timeout = setTimeout(() => setLoading(false), 4000);
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
-
-      // Clean up previous profile listener
-      if (unsubscribeProfile) {
-        unsubscribeProfile();
-        unsubscribeProfile = undefined;
+    const authUnsub = onAuthStateChanged(auth, (firebaseUser) => {
+      // Clean up previous profile listener before setting up a new one
+      if (profileUnsub) {
+        profileUnsub();
+        profileUnsub = undefined;
       }
 
-      if (firebaseUser) {
-        unsubscribeProfile = onSnapshot(
-          doc(db, 'users', firebaseUser.uid),
-          (docSnap) => {
-            setProfile(docSnap.exists() ? (docSnap.data() as UserProfile) : null);
-            clearTimeout(timeout);
-            setLoading(false);
-          },
-          (error) => {
-            // Firestore read failed (rules, network, etc.) — don't block the UI
-            console.error('[AuthContext] Profile snapshot error:', error);
-            handleFirestoreError(error, OperationType.GET, `users/${firebaseUser.uid}`);
-            setProfile(null);
-            clearTimeout(timeout);
-            setLoading(false);
-          }
-        );
-      } else {
+      setUser(firebaseUser);
+
+      if (!firebaseUser) {
         setProfile(null);
         clearTimeout(timeout);
         setLoading(false);
+        return;
       }
+
+      // Listen to the user's Firestore profile in real-time
+      profileUnsub = onSnapshot(
+        doc(db, 'users', firebaseUser.uid),
+        (snap) => {
+          setProfile(snap.exists() ? (snap.data() as UserProfile) : null);
+          clearTimeout(timeout);
+          setLoading(false);
+        },
+        (err) => {
+          // Rules may block read in some states — don't hang the app
+          console.warn('[AuthContext] Could not load profile:', err.code);
+          setProfile(null);
+          clearTimeout(timeout);
+          setLoading(false);
+        }
+      );
     });
 
     return () => {
       clearTimeout(timeout);
-      unsubscribeAuth();
-      if (unsubscribeProfile) unsubscribeProfile();
+      authUnsub();
+      if (profileUnsub) profileUnsub();
     };
   }, []);
 
