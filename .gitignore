@@ -1,0 +1,14 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Firebase config contains API keys — do not commit
+firebase-applet-config.json
+
+# Uploaded files (use cloud storage in prod)
+uploads/

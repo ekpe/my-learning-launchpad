@@ -1,0 +1,244 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores additional information about the user.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The unique identifier for the user."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The user's full name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["ADMIN", "INSTRUCTOR", "STUDENT"],
+          "description": "The user's role in the system."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the profile was created."
+        }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Enrollment": {
+      "title": "Enrollment",
+      "description": "Tracks a student's enrollment in a course.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The ID of the student."
+        },
+        "courseId": {
+          "type": "string",
+          "description": "The ID of the course."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ENROLLED", "IN_PROGRESS", "COMPLETED"],
+          "description": "The current status of the enrollment."
+        },
+        "enrolledAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the student enrolled."
+        },
+        "progress": {
+          "type": "integer",
+          "description": "Percentage of course completed."
+        },
+        "completedLessons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of completed lesson IDs."
+        }
+      },
+      "required": ["userId", "courseId", "status", "enrolledAt"]
+    },
+    "QuizAttempt": {
+      "title": "Quiz Attempt",
+      "description": "Tracks a student's attempt at a course quiz.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The ID of the student."
+        },
+        "courseId": {
+          "type": "string",
+          "description": "The ID of the course."
+        },
+        "quizId": {
+          "type": "string",
+          "description": "The ID of the quiz (e.g., moduleIndex_lessonIndex)."
+        },
+        "score": {
+          "type": "integer",
+          "description": "The score achieved."
+        },
+        "totalQuestions": {
+          "type": "integer",
+          "description": "Total number of questions in the quiz."
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the attempt was completed."
+        },
+        "passed": {
+          "type": "boolean",
+          "description": "Whether the student passed the quiz."
+        }
+      },
+      "required": ["userId", "courseId", "quizId", "score", "totalQuestions", "completedAt", "passed"]
+    },
+    "Certificate": {
+      "title": "Certificate",
+      "description": "Stores course completion certificates.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The ID of the student."
+        },
+        "courseId": {
+          "type": "string",
+          "description": "The ID of the course."
+        },
+        "courseTitle": {
+          "type": "string",
+          "description": "The title of the course."
+        },
+        "userName": {
+          "type": "string",
+          "description": "The name of the student."
+        },
+        "issuedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the certificate was issued."
+        },
+        "certificateId": {
+          "type": "string",
+          "description": "Unique certificate identifier."
+        }
+      },
+      "required": ["userId", "courseId", "courseTitle", "userName", "issuedAt", "certificateId"]
+    },
+    "ForumPost": {
+      "title": "Forum Post",
+      "description": "A post or reply in a course discussion forum.",
+      "type": "object",
+      "properties": {
+        "courseId": {
+          "type": "string",
+          "description": "The ID of the course."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the author."
+        },
+        "userName": {
+          "type": "string",
+          "description": "The name of the author."
+        },
+        "content": {
+          "type": "string",
+          "description": "The content of the post."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the post was created."
+        },
+        "parentId": {
+          "type": "string",
+          "description": "The ID of the parent post (if this is a reply)."
+        },
+        "likes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of user IDs who liked the post."
+        }
+      },
+      "required": ["courseId", "userId", "userName", "content", "createdAt"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "A course offered on the platform.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "fullDescription": { "type": "string" },
+        "image": { "type": "string" },
+        "duration": { "type": "string" },
+        "audience": { "type": "string" },
+        "isFree": { "type": "boolean" },
+        "learningObjectives": { "type": "array", "items": { "type": "string" } },
+        "curriculum": { "type": "array", "items": { "type": "object" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "description", "image", "duration", "audience"]
+    },
+    "AnalyticsEvent": {
+      "title": "Analytics Event",
+      "description": "An event tracked for analytics purposes.",
+      "type": "object",
+      "properties": {
+        "event": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["event", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Collection of user profiles."
+    },
+    "/enrollments/{enrollmentId}": {
+      "schema": "Enrollment",
+      "description": "Collection of course enrollments."
+    },
+    "/quizAttempts/{attemptId}": {
+      "schema": "QuizAttempt",
+      "description": "Collection of student quiz attempts."
+    },
+    "/certificates/{certificateId}": {
+      "schema": "Certificate",
+      "description": "Collection of course completion certificates."
+    },
+    "/forumPosts/{postId}": {
+      "schema": "ForumPost",
+      "description": "Collection of course discussion posts."
+    },
+    "/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Collection of courses."
+    },
+    "/analytics/{eventId}": {
+      "schema": "AnalyticsEvent",
+      "description": "Collection of analytics events."
+    }
+  }
+}

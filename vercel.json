@@ -1,0 +1,29 @@
+{
+  "framework": "vite",
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/health", "destination": "/api/health" },
+    { "source": "/api/create-checkout-session", "destination": "/api/create-checkout-session" },
+    { "source": "/api/checkout-session/:sessionId", "destination": "/api/checkout-session?sessionId=:sessionId" },
+    { "source": "/api/stripe-webhook", "destination": "/api/stripe-webhook" },
+    { "source": "/api/send-email", "destination": "/api/send-email" },
+    { "source": "/api/auth/login", "destination": "/api/auth-login" },
+    { "source": "/api/admin/users", "destination": "/api/admin/users" },
+    { "source": "/api/admin/create-user", "destination": "/api/admin/create-user" },
+    { "source": "/api/admin/update-user-role", "destination": "/api/admin/update-user-role" },
+    { "source": "/api/admin/users/:uid", "destination": "/api/admin/delete-user?uid=:uid" },
+    { "source": "/api/admin/upload", "destination": "/api/admin/upload" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,PATCH,DELETE,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" }
+      ]
+    }
+  ]
+}
