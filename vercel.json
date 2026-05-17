@@ -2,11 +2,6 @@
   "framework": "vite",
   "buildCommand": "vite build",
   "outputDirectory": "dist",
-  "functions": {
-    "api/**/*.ts": {
-      "runtime": "nodejs20.x"
-    }
-  },
   "rewrites": [
     { "source": "/api/health",                    "destination": "/api/health" },
     { "source": "/api/debug-admin",               "destination": "/api/debug-admin" },
