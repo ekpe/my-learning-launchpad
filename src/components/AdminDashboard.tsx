@@ -124,28 +124,42 @@ export const AdminDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    
+    // Use a counter so loading clears as soon as ALL four snapshots have fired at least once.
+    // Without this, a blocked/empty collection keeps the dashboard spinning forever.
+    let resolved = 0;
+    const total = 4;
+    const tryResolve = () => { if (++resolved >= total) setLoading(false); };
+
+    // Safety net — never spin more than 6 seconds
+    const timeout = setTimeout(() => setLoading(false), 6000);
+
     // Subscribe to users
     const usersUnsub = onSnapshot(collection(db, 'users'), (snapshot) => {
-      const usersData = snapshot.docs.map(doc => doc.data() as UserProfile);
-      setUsers(usersData);
+      setUsers(snapshot.docs.map(doc => doc.data() as UserProfile));
+      tryResolve();
     }, (error) => {
       console.error('Firestore users subscription error:', error);
-      setStatus({ type: 'error', message: 'Failed to load users. Check permissions.' });
+      setStatus({ type: 'error', message: `Failed to load users: ${error.message}` });
+      tryResolve();
     });
 
     // Subscribe to enrollments
     const enrollmentsUnsub = onSnapshot(collection(db, 'enrollments'), (snapshot) => {
-      const enrollmentsData = snapshot.docs.map(doc => doc.data() as Enrollment);
-      setEnrollments(enrollmentsData);
+      setEnrollments(snapshot.docs.map(doc => doc.data() as Enrollment));
+      tryResolve();
+    }, (error) => {
+      console.error('Firestore enrollments error:', error);
+      tryResolve();
     });
 
     // Subscribe to courses
     const coursesUnsub = onSnapshot(collection(db, 'courses'), (snapshot) => {
-      const coursesData = snapshot.docs.map(doc => doc.data() as Course);
-      setDbCourses(coursesData);
-      setLoading(false);
+      setDbCourses(snapshot.docs.map(doc => doc.data() as Course));
+      tryResolve();
+    }, (error) => {
+      console.error('Firestore courses error:', error);
+      setStatus({ type: 'error', message: `Failed to load courses: ${error.message}` });
+      tryResolve();
     });
 
     // Subscribe to analytics
@@ -153,7 +167,6 @@ export const AdminDashboard: React.FC = () => {
       const analyticsData = snapshot.docs.map(doc => {
         const data = doc.data();
         let timestamp = new Date();
-        
         if (data.timestamp) {
           if (typeof data.timestamp.toDate === 'function') {
             timestamp = data.timestamp.toDate();
@@ -163,17 +176,17 @@ export const AdminDashboard: React.FC = () => {
             timestamp = new Date(data.timestamp.seconds * 1000);
           }
         }
-
-        return {
-          id: doc.id,
-          ...data,
-          timestamp
-        };
+        return { id: doc.id, ...data, timestamp };
       });
       setAnalytics(analyticsData);
+      tryResolve();
+    }, (error) => {
+      console.error('Firestore analytics error:', error);
+      tryResolve(); // non-fatal
     });
 
     return () => {
+      clearTimeout(timeout);
       usersUnsub();
       enrollmentsUnsub();
       coursesUnsub();
@@ -328,16 +341,21 @@ export const AdminDashboard: React.FC = () => {
     setSyncing(true);
     setStatus(null);
     try {
-      for (const course of staticCourses) {
-        await setDoc(doc(db, 'courses', course.id), {
-          ...course,
-          createdAt: serverTimestamp()
-        }, { merge: true });
-      }
-      setStatus({ type: 'success', message: 'Courses synced successfully!' });
-    } catch (error) {
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch('/api/admin?resource=sync-courses', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ courses: staticCourses })
+      });
+      const data = await safeJson(response);
+      if (!response.ok) throw new Error(data.error || 'Sync failed');
+      setStatus({ type: 'success', message: `Courses synced — ${data.synced} course${data.synced !== 1 ? 's' : ''} written.` });
+    } catch (error: any) {
       console.error('Error syncing courses:', error);
-      setStatus({ type: 'error', message: 'Failed to sync courses.' });
+      setStatus({ type: 'error', message: error.message || 'Failed to sync courses.' });
     } finally {
       setSyncing(false);
     }

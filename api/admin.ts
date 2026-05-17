@@ -126,6 +126,28 @@ async function uploadFile(req: VercelRequest, res: VercelResponse) {
   res.json({ url: `https://storage.googleapis.com/${storageBucket}/${filePath}`, filename: filePath });
 }
 
+async function syncCourses(req: VercelRequest, res: VercelResponse) {
+  const { courses } = await parseJsonBody(req);
+  if (!Array.isArray(courses) || courses.length === 0)
+    return res.status(400).json({ error: "courses array is required" });
+
+  let synced = 0;
+  const errors: string[] = [];
+  for (const course of courses) {
+    if (!course.id) { errors.push(`Course missing id: ${course.title}`); continue; }
+    try {
+      await db.collection("courses").doc(course.id).set(
+        { ...course, updatedAt: FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+      synced++;
+    } catch (e: any) {
+      errors.push(`${course.id}: ${e.message}`);
+    }
+  }
+  res.json({ success: true, synced, errors: errors.length > 0 ? errors : undefined });
+}
+
 async function syncUsers(req: VercelRequest, res: VercelResponse) {
   const adminEmail = process.env.ADMIN_EMAIL ?? "";
   const created: string[] = [];
@@ -181,6 +203,7 @@ export default withAdmin(async (req: VercelRequest, res: VercelResponse) => {
     if (req.method === "POST" && resource === "update-user-role") return await updateUserRole(req, res);
     if (req.method === "DELETE" && resource === "delete-user") return await deleteUser(req, res);
     if (req.method === "POST" && resource === "upload") return await uploadFile(req, res);
+    if (req.method === "POST" && resource === "sync-courses") return await syncCourses(req, res);
     if (req.method === "POST" && resource === "sync-users") return await syncUsers(req, res);
 
     return res.status(404).json({ error: `Unknown admin resource: ${resource}` });
