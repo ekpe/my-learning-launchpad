@@ -184,7 +184,7 @@ export const AdminDashboard: React.FC = () => {
   const handleRoleChange = async (userId: string, newRole: 'ADMIN' | 'INSTRUCTOR' | 'STUDENT') => {
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const response = await fetch('/api/admin/update-user-role', {
+      const response = await fetch('/api/admin?resource=update-user-role', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -211,7 +211,7 @@ export const AdminDashboard: React.FC = () => {
     setStatus(null);
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const response = await fetch('/api/admin/sync-users', {
+      const response = await fetch('/api/admin?resource=sync-users', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${idToken}` }
       });
@@ -234,7 +234,7 @@ export const AdminDashboard: React.FC = () => {
     setStatus(null);
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const response = await fetch('/api/admin/create-user', {
+      const response = await fetch('/api/admin?resource=create-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -270,7 +270,7 @@ export const AdminDashboard: React.FC = () => {
     setStatus(null);
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      const response = await fetch(`/api/admin/users/${userId}`, {
+      const response = await fetch(`/api/admin?resource=delete-user&uid=${userId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${idToken}`
@@ -301,7 +301,7 @@ export const AdminDashboard: React.FC = () => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/admin/upload', {
+      const response = await fetch('/api/admin?resource=upload', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${idToken}`
