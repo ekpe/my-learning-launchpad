@@ -191,24 +191,24 @@ export default withAdmin(async (req: VercelRequest, res: VercelResponse) => {
     return res.status(503).json({
       error: "Firebase Admin not initialised",
       details: adminInitError,
-      hint: "Set FIREBASE_SERVICE_ACCOUNT_KEY in Vercel environment variables.",
+      hint: "Set FIREBASE_SERVICE_ACCOUNT_KEY in Vercel environment variables. Visit /api/debug-admin for diagnostics.",
     });
   }
 
   const resource = req.query.resource as string;
 
   try {
-    if (req.method === "GET" && resource === "users") return await getUsers(req, res);
-    if (req.method === "POST" && resource === "create-user") return await createUser(req, res);
-    if (req.method === "POST" && resource === "update-user-role") return await updateUserRole(req, res);
-    if (req.method === "DELETE" && resource === "delete-user") return await deleteUser(req, res);
-    if (req.method === "POST" && resource === "upload") return await uploadFile(req, res);
-    if (req.method === "POST" && resource === "sync-courses") return await syncCourses(req, res);
-    if (req.method === "POST" && resource === "sync-users") return await syncUsers(req, res);
+    if (req.method === "GET"    && resource === "users")            return await getUsers(req, res);
+    if (req.method === "POST"   && resource === "create-user")      return await createUser(req, res);
+    if (req.method === "POST"   && resource === "update-user-role") return await updateUserRole(req, res);
+    if (req.method === "DELETE" && resource === "delete-user")      return await deleteUser(req, res);
+    if (req.method === "POST"   && resource === "upload")           return await uploadFile(req, res);
+    if (req.method === "POST"   && resource === "sync-courses")     return await syncCourses(req, res);
+    if (req.method === "POST"   && resource === "sync-users")       return await syncUsers(req, res);
 
-    return res.status(404).json({ error: `Unknown admin resource: ${resource}` });
+    return res.status(404).json({ error: `Unknown admin resource: "${resource}"` });
   } catch (err: any) {
-    console.error(`[admin] ${resource} error:`, err.message);
+    console.error(`[admin] ${resource} error:`, err.message, err.stack);
     res.status(500).json({ error: err.message });
   }
 });

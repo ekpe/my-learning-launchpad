@@ -4,6 +4,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/api/health",                    "destination": "/api/health" },
+    { "source": "/api/debug-admin",               "destination": "/api/debug-admin" },
     { "source": "/api/config-check",              "destination": "/api/config-check" },
     { "source": "/api/create-checkout-session",   "destination": "/api/create-checkout-session" },
     { "source": "/api/checkout-session",          "destination": "/api/checkout-session" },
