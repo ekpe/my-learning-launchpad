@@ -5,7 +5,7 @@ export type AdminHandler = (
   req: VercelRequest,
   res: VercelResponse,
   uid: string
-) => Promise<void>;
+) => Promise<void | VercelResponse>;
 
 export function withAdmin(handler: AdminHandler) {
   return async (req: VercelRequest, res: VercelResponse) => {

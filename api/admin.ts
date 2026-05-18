@@ -161,7 +161,7 @@ async function syncUsers(req: VercelRequest, res: VercelResponse) {
     for (const user of result.users) {
       try {
         const docRef = db.collection("users").doc(user.uid);
-        if ((await docRef.get()).exists()) { skipped.push(user.uid); continue; }
+        if ((await docRef.get()).exists) { skipped.push(user.uid); continue; }
         await docRef.set({
           uid: user.uid,
           email: user.email ?? "",
