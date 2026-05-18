@@ -65,17 +65,13 @@ export const LeadMagnetModal: React.FC<LeadMagnetModalProps> = ({ isOpen, onClos
         });
 
         if (emailResult.status === 'skipped') {
-          console.warn('Email delivery was skipped: SendGrid API key is likely missing.');
-          // We still set submitted to true so the UI transitions, 
-          // but we can add a local state to show a "Configuration Required" message to the admin
-          setSubmitted(true);
+          console.warn('[LeadMagnet] Email skipped — RESEND_API_KEY not configured.');
         } else if (emailResult.status === 'error') {
-          console.error('Email delivery failed:', emailResult.message);
-          setError(`Email delivery failed: ${emailResult.message}. The lead was saved, but the email could not be sent.`);
-          // Don't transition to success if it's a real error (not just skipped config)
-        } else {
-          setSubmitted(true);
+          // Log for admin but don't surface to user — lead is already saved
+          console.error('[LeadMagnet] Email failed:', emailResult.message);
         }
+        // Always show success — the lead was saved regardless of email status
+        setSubmitted(true);
       } catch (emailErr) {
         console.error('Failed to trigger email delivery:', emailErr);
         setSubmitted(true); // Still show success since lead is saved
