@@ -7,16 +7,6 @@ import { doc, getDoc, updateDoc, onSnapshot, setDoc, serverTimestamp } from 'fir
 import { sendEmail } from '../services/emailService';
 import ReactPlayer from 'react-player';
 import { logEvent, AnalyticsEvent } from '../services/analyticsService';
-import { GoogleGenAI } from "@google/genai";
-
-declare global {
-  interface Window {
-    aistudio: {
-      hasSelectedApiKey: () => Promise<boolean>;
-      openSelectKey: () => Promise<void>;
-    };
-  }
-}
 
 const Player = ReactPlayer as any;
 import { 
@@ -50,10 +40,6 @@ export const LessonViewer = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [course, setCourse] = useState<Course | undefined>(courses.find(c => c.id === courseId));
   const playerRef = useRef<any>(null);
-  
-  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
-  const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
-  const [generationStatus, setGenerationStatus] = useState<string>('');
 
   useEffect(() => {
     if (courseId && moduleIndex && lessonIndex) {
@@ -130,6 +116,7 @@ export const LessonViewer = () => {
       // Send lesson completion email
       if (user.email && currentLesson) {
         await sendEmail({
+          context: 'self',
           to: user.email,
           subject: `Lesson Completed: ${currentLesson.title}`,
           text: `Hi ${user.displayName || 'Student'},\n\nGreat job! You've successfully completed the lesson "${currentLesson.title}" in the course "${course?.title}".\n\nYour progress: ${progress}%\n\nKeep going: ${window.location.origin}/course/${courseId}`,
@@ -163,81 +150,6 @@ export const LessonViewer = () => {
       }
     } catch (error) {
       console.error("Error updating progress:", error);
-    }
-  };
-
-  const handleGenerateVideo = async () => {
-    if (!currentLesson) return;
-
-    try {
-      const hasKey = await window.aistudio.hasSelectedApiKey();
-      if (!hasKey) {
-        await window.aistudio.openSelectKey();
-        // Proceeding assuming key selection was successful as per guidelines
-      }
-
-      setIsGeneratingVideo(true);
-      setGenerationStatus('Initializing AI model...');
-
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      
-      setGenerationStatus('Generating video (this may take a few minutes)...');
-      
-      let operation = await ai.models.generateVideos({
-        model: 'veo-3.1-fast-generate-preview',
-        prompt: `A professional educational video about ${currentLesson.title}. ${currentLesson.description || ''}`,
-        config: {
-          numberOfVideos: 1,
-          resolution: '720p',
-          aspectRatio: '16:9'
-        }
-      });
-
-      // Poll for completion
-      while (!operation.done) {
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        operation = await ai.operations.getVideosOperation({ operation: operation });
-        setGenerationStatus('Processing video content...');
-      }
-
-      const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-      if (!downloadLink) throw new Error('Video generation failed - no download link');
-
-      setGenerationStatus('Finalizing video...');
-      
-      const response = await fetch(downloadLink, {
-        method: 'GET',
-        headers: {
-          'x-goog-api-key': process.env.API_KEY || '',
-        },
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch generated video');
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setGeneratedVideoUrl(url);
-      setIsGeneratingVideo(false);
-      setGenerationStatus('');
-      
-      logEvent(AnalyticsEvent.VIDEO_PLAY, { 
-        courseId, 
-        lessonId, 
-        videoUrl: 'generated-video',
-        isGenerated: true 
-      });
-
-    } catch (error: any) {
-      console.error('Video generation error:', error);
-      setIsGeneratingVideo(false);
-      setGenerationStatus('');
-      
-      if (error.message?.includes('Requested entity was not found')) {
-        alert('API key issue detected. Please re-select your API key.');
-        await window.aistudio.openSelectKey();
-      } else {
-        alert('Failed to generate video. Please try again later.');
-      }
     }
   };
 
@@ -390,20 +302,7 @@ export const LessonViewer = () => {
           <div className="max-w-4xl mx-auto p-6 md:p-12">
             {/* Video Player */}
             <div className="aspect-video bg-slate-900 rounded-3xl mb-10 overflow-hidden shadow-2xl relative">
-              {isGeneratingVideo ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center">
-                  <Loader2 className="w-12 h-12 animate-spin text-blue-400 mb-4" />
-                  <p className="text-lg font-bold mb-2">Generating AI Video</p>
-                  <p className="text-sm text-slate-400 max-w-xs">{generationStatus}</p>
-                </div>
-              ) : generatedVideoUrl ? (
-                <video 
-                  src={generatedVideoUrl} 
-                  controls 
-                  className="w-full h-full object-cover"
-                  autoPlay
-                />
-              ) : currentLesson?.videoUrl ? (
+              {currentLesson?.videoUrl ? (
                 <Player
                   ref={playerRef}
                   url={currentLesson.videoUrl}
@@ -423,13 +322,6 @@ export const LessonViewer = () => {
                   <div className="z-10 text-center p-6">
                     <p className="text-xs font-bold uppercase tracking-widest text-blue-400 mb-4">No Video Content</p>
                     <h2 className="text-2xl font-bold text-white mb-6">{currentLesson?.title}</h2>
-                    <Button 
-                      onClick={handleGenerateVideo}
-                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-8 py-6 h-auto text-lg shadow-xl shadow-blue-900/40 group-hover:scale-105 transition-transform"
-                    >
-                      <PlayCircle className="w-6 h-6 mr-2" />
-                      Generate AI Lesson Video
-                    </Button>
                   </div>
                 </div>
               )}
@@ -442,21 +334,7 @@ export const LessonViewer = () => {
                     <p className="text-slate-500">Module {mIdx + 1} • Lesson {lIdx + 1}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    {!currentLesson?.videoUrl && !generatedVideoUrl && (
-                      <Button
-                        variant="outline"
-                        onClick={handleGenerateVideo}
-                        disabled={isGeneratingVideo}
-                        className="rounded-full border-blue-200 text-blue-700 hover:bg-blue-50"
-                      >
-                        {isGeneratingVideo ? (
-                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
-                        ) : (
-                          <><PlayCircle className="w-4 h-4 mr-2" /> Generate Video</>
-                        )}
-                      </Button>
-                    )}
-                    <Button 
+                    <Button
                       onClick={handleMarkComplete}
                       variant={isCompleted ? "outline" : "default"}
                       className={`rounded-full px-8 transition-all ${isCompleted ? 'border-green-500 text-green-600 hover:bg-green-50' : ''}`}

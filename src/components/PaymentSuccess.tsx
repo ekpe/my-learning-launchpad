@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { db } from '../firebase';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { sendEmail } from '../services/emailService';
 import { CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
 import { Button } from './ui/Button';
@@ -25,22 +23,21 @@ export const PaymentSuccess = () => {
       }
 
       try {
-        // Verify session status with the server
-        const response = await fetch(`/api/checkout-session/${sessionId}`);
-        const session = await response.json();
+        // Verified server-side: confirms payment with Stripe directly and
+        // writes the enrollment with the Admin SDK. The client is never
+        // trusted to say "I paid" — see api/verify-enrollment.ts.
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/verify-enrollment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ sessionId }),
+        });
+        const result = await response.json();
 
-        if (session.payment_status === 'paid') {
-          // Create enrollment in Firestore
-          const enrollmentId = `${user.uid}_${courseId}`;
-          await setDoc(doc(db, 'enrollments', enrollmentId), {
-            userId: user.uid,
-            courseId: courseId,
-            status: 'ENROLLED',
-            enrolledAt: serverTimestamp(),
-            progress: 0,
-            paymentId: sessionId
-          });
-
+        if (response.ok && result.success) {
           logEvent(AnalyticsEvent.COURSE_ENROLLMENT, {
             courseId,
             sessionId,
@@ -50,6 +47,7 @@ export const PaymentSuccess = () => {
           // Send enrollment email
           if (user.email) {
             await sendEmail({
+              context: 'self',
               to: user.email,
               subject: `Welcome to your new course!`,
               text: `Hi ${user.displayName || 'Student'},\n\nYou've successfully enrolled in your new course.\n\nStart learning now: ${window.location.origin}/course/${courseId}`,

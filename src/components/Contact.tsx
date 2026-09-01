@@ -21,6 +21,7 @@ export const Contact = () => {
     
     try {
       await sendEmail({
+        context: 'public',
         to: 'info@mylearninglaunchpad.com', // Internal notification
         subject: `Contact Form: ${formState.name} from ${formState.organization}`,
         text: `Name: ${formState.name}\nEmail: ${formState.email}\nOrganization: ${formState.organization}\n\nMessage:\n${formState.message}`,
@@ -36,6 +37,7 @@ export const Contact = () => {
 
       // Also send a confirmation to the user
       await sendEmail({
+        context: 'public',
         to: formState.email,
         subject: 'We received your message!',
         text: `Hi ${formState.name},\n\nThank you for reaching out to My Learning Launchpad. We have received your message and will get back to you shortly.\n\nBest regards,\nThe Team`,

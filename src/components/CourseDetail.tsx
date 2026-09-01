@@ -83,8 +83,6 @@ export const CourseDetail = () => {
           },
           body: JSON.stringify({
             courseId: id,
-            courseName: course.title,
-            price: course.price || 99, // Default price if not set
             userId: user.uid,
           }),
         });
@@ -118,6 +116,7 @@ export const CourseDetail = () => {
       // Send enrollment email
       if (user.email) {
         await sendEmail({
+          context: 'self',
           to: user.email,
           subject: `Welcome to ${course.title}!`,
           text: `Hi ${user.displayName || 'Student'},\n\nYou've successfully enrolled in "${course.title}".\n\nStart learning now: ${window.location.origin}/course/${course.id}`,

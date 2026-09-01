@@ -47,6 +47,7 @@ export const LeadMagnetModal: React.FC<LeadMagnetModalProps> = ({ isOpen, onClos
         const downloadUrl = import.meta.env.VITE_GUIDE_PDF_URL || defaultUrl;
         
         const emailResult = await sendEmail({
+          context: 'public',
           to: email,
           subject: 'Your Free AI Strategy Playbook is Here!',
           text: `Hi ${name},\n\nThank you for downloading the AI Strategy Playbook. You can access it here: ${downloadUrl}\n\nBest regards,\nThe AI Executive Team`,

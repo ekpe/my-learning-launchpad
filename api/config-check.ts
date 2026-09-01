@@ -8,6 +8,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const checks = {
     firebaseAdmin: !adminInitError,
     stripe: !!process.env.STRIPE_SECRET_KEY,
+    stripeWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
     resend: !!process.env.RESEND_API_KEY,
     adminEmail: !!process.env.ADMIN_EMAIL,
     firestoreDbId: !!process.env.FIRESTORE_DATABASE_ID,

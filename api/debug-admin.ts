@@ -1,6 +1,15 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { withAdmin } from "./_lib/with-admin";
+import { handleOptions } from "./_lib/cors";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+// Diagnostic report for Firebase Admin setup. Gated behind withAdmin so it
+// isn't public — it discloses the service account's project id/client email
+// and performs live Firestore/Auth calls. Token verification only needs the
+// project id (not a working service account), so this stays reachable for a
+// real admin even while diagnosing a broken FIREBASE_SERVICE_ACCOUNT_KEY.
+export default withAdmin(async (req: VercelRequest, res: VercelResponse) => {
+  if (handleOptions(req, res)) return;
+
   const report: Record<string, any> = {
     node_version: process.version,
     FIRESTORE_DATABASE_ID: process.env.FIRESTORE_DATABASE_ID ?? "(not set)",
@@ -63,4 +72,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   res.json(report);
-}
+});

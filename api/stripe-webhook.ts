@@ -24,28 +24,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!secretKey) return res.status(500).json({ error: "Stripe not configured" });
+  if (!webhookSecret) {
+    // Refuse rather than trust an unverified body — without this, anyone
+    // could POST a forged "checkout.session.completed" event and grant
+    // themselves a free enrollment. Fail loud so misconfiguration is
+    // obvious instead of silently accepting unauthenticated events.
+    console.error("[Webhook] STRIPE_WEBHOOK_SECRET not set — refusing to process unverified events");
+    return res.status(503).json({ error: "Webhook not configured: STRIPE_WEBHOOK_SECRET missing" });
+  }
 
   const stripe = new Stripe(secretKey);
   const sig = req.headers["stripe-signature"] as string;
   const rawBody = await getRawBody(req);
 
   let event: Stripe.Event;
-
-  if (webhookSecret) {
-    try {
-      event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
-    } catch (err: any) {
-      console.error("[Webhook] Signature verification failed:", err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-  } else {
-    // Dev only — skip verification if secret not configured
-    console.warn("[Webhook] STRIPE_WEBHOOK_SECRET not set — skipping signature check");
-    try {
-      event = JSON.parse(rawBody.toString()) as Stripe.Event;
-    } catch {
-      return res.status(400).json({ error: "Invalid JSON body" });
-    }
+  try {
+    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+  } catch (err: any) {
+    console.error("[Webhook] Signature verification failed:", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
   if (event.type === "checkout.session.completed") {

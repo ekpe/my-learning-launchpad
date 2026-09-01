@@ -7,7 +7,7 @@
     { "source": "/api/debug-admin",               "destination": "/api/debug-admin" },
     { "source": "/api/config-check",              "destination": "/api/config-check" },
     { "source": "/api/create-checkout-session",   "destination": "/api/create-checkout-session" },
-    { "source": "/api/checkout-session",          "destination": "/api/checkout-session" },
+    { "source": "/api/verify-enrollment",         "destination": "/api/verify-enrollment" },
     { "source": "/api/stripe-webhook",            "destination": "/api/stripe-webhook" },
     { "source": "/api/send-email",                "destination": "/api/send-email" },
     { "source": "/api/auth/login",                "destination": "/api/auth-login" },

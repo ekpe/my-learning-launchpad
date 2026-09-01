@@ -208,8 +208,9 @@ async function startServer() {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
-      console.warn("[Webhook] STRIPE_WEBHOOK_SECRET not set — skipping signature verification");
-      return res.json({ received: true });
+      // Refuse rather than trust an unverified body — see api/stripe-webhook.ts.
+      console.error("[Webhook] STRIPE_WEBHOOK_SECRET not set — refusing to process unverified events");
+      return res.status(503).json({ error: "Webhook not configured: STRIPE_WEBHOOK_SECRET missing" });
     }
 
     let event: Stripe.Event;
@@ -248,10 +249,33 @@ async function startServer() {
   // API routes
   app.post("/api/create-checkout-session", async (req, res) => {
     try {
-      const { courseId, courseName, price, userId } = req.body;
+      const { courseId, userId } = req.body;
 
       if (!stripe) {
         return res.status(503).json({ error: "Stripe not configured — set STRIPE_SECRET_KEY" });
+      }
+      if (!db) {
+        return res.status(500).json({ error: "Firebase Admin not initialized" });
+      }
+      if (!courseId || !userId) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Price and title come from Firestore, never from the client — trusting
+      // a client-supplied price would let anyone check out for any amount.
+      const courseSnap = await db.collection("courses").doc(courseId).get();
+      if (!courseSnap.exists) {
+        return res.status(404).json({ error: "Course not found" });
+      }
+      const course = courseSnap.data();
+
+      if (course.isFree) {
+        return res.status(400).json({ error: "This course is free — enroll directly, no checkout needed" });
+      }
+
+      const price = Number(course.price);
+      if (!Number.isFinite(price) || price <= 0) {
+        return res.status(500).json({ error: "Course does not have a valid price configured" });
       }
 
       const session = await stripe.checkout.sessions.create({
@@ -261,7 +285,7 @@ async function startServer() {
             price_data: {
               currency: "usd",
               product_data: {
-                name: courseName,
+                name: course.title || "Course",
               },
               unit_amount: Math.round(price * 100), // Stripe expects cents
             },
@@ -284,202 +308,191 @@ async function startServer() {
     }
   });
 
-  app.get("/api/checkout-session/:sessionId", async (req, res) => {
+  // Confirms payment with Stripe directly and writes the enrollment via the
+  // Admin SDK. Mirrors api/verify-enrollment.ts — the client is never
+  // trusted to say "I paid".
+  app.post("/api/verify-enrollment", async (req, res) => {
     try {
-      const { sessionId } = req.params;
+      if (!stripe) return res.status(500).json({ error: "Stripe not configured" });
+      if (!auth || !db) return res.status(500).json({ error: "Firebase Admin not initialized" });
+
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "Unauthorized: missing Bearer token" });
+      }
+
+      let decodedToken;
+      try {
+        decodedToken = await auth.verifyIdToken(authHeader.split("Bearer ")[1]);
+      } catch (err: any) {
+        return res.status(401).json({ error: `Invalid token: ${err.message}` });
+      }
+
+      const { sessionId } = req.body || {};
+      if (!sessionId) return res.status(400).json({ error: "sessionId is required" });
+
       const session = await stripe.checkout.sessions.retrieve(sessionId);
-      res.json(session);
+      if (session.payment_status !== "paid") {
+        return res.status(402).json({ error: "Payment not completed" });
+      }
+
+      const { courseId, userId } = session.metadata || {};
+      if (!courseId || !userId) {
+        return res.status(400).json({ error: "Session is missing courseId/userId metadata" });
+      }
+      if (userId !== decodedToken.uid) {
+        return res.status(403).json({ error: "This checkout session does not belong to you" });
+      }
+
+      const enrollmentId = `${userId}_${courseId}`;
+      await db.collection("enrollments").doc(enrollmentId).set(
+        {
+          userId,
+          courseId,
+          status: "ENROLLED",
+          enrolledAt: FieldValue.serverTimestamp(),
+          progress: 0,
+          paymentId: session.id,
+        },
+        { merge: true }
+      );
+
+      res.json({ success: true, courseId, status: "ENROLLED" });
     } catch (error: any) {
+      console.error("[verify-enrollment] error:", error.message);
       res.status(500).json({ error: error.message });
     }
   });
 
-  app.post("/api/admin/upload", verifyAdmin, upload.single("file"), async (req, res) => {
+  // Consolidated admin dispatch — mirrors api/admin.ts's `?resource=` query
+  // param routing exactly. AdminDashboard.tsx only ever calls
+  // `/api/admin?resource=...`; the previous per-route Express endpoints here
+  // (`/api/admin/users`, `/api/admin/create-user`, etc.) used a different URL
+  // shape the frontend never actually requested, so every admin action was
+  // silently broken in local dev. Also fills in sync-courses/sync-users,
+  // which existed in production but had no local-dev equivalent at all.
+  app.all("/api/admin", verifyAdmin, upload.single("file"), async (req, res) => {
+    const resource = req.query.resource as string;
     try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
-      const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
-      res.json({ url: fileUrl, filename: req.file.filename });
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // User Management
-  app.get("/api/admin/users", verifyAdmin, async (req, res) => {
-    try {
-      const usersSnapshot = await db.collection("users").get();
-      const users = usersSnapshot.docs.map((doc) => ({
-        uid: doc.id,
-        ...doc.data(),
-      }));
-      res.json(users);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post("/api/admin/create-user", verifyAdmin, async (req, res) => {
-    try {
-      const { email, password, displayName, role } = req.body;
-      console.log(`API: create-user request for ${email}, role: ${role}`);
-      
-      if (!db) {
-        throw new Error("Firestore service not initialized");
+      if (!auth || !db) {
+        return res.status(500).json({ error: "Firebase Admin not initialized" });
       }
 
-      const firebaseConfig = firebaseAppletConfig;
-      const apiKey = firebaseConfig.apiKey;
-
-      console.log("API: Creating user via REST API...");
-      const restResponse = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          password,
-          displayName,
-          returnSecureToken: true
-        })
-      });
-
-      const restData: any = await restResponse.json();
-
-      if (!restResponse.ok) {
-        console.error("REST API Error:", restData);
-        throw new Error(restData.error?.message || "Failed to create user via REST API");
+      if (req.method === "GET" && resource === "users") {
+        const snapshot = await db.collection("users").get();
+        return res.json(snapshot.docs.map((d: any) => ({ uid: d.id, ...d.data() })));
       }
 
-      const uid = restData.localId;
-      console.log(`API: User created with UID: ${uid}`);
-
-      // Helper to convert to Firestore REST format
-      const toFirestoreValue = (val: any): any => {
-        if (typeof val === 'string') return { stringValue: val };
-        if (typeof val === 'number') return { doubleValue: val };
-        if (typeof val === 'boolean') return { booleanValue: val };
-        if (val === null) return { nullValue: null };
-        if (Array.isArray(val)) return { arrayValue: { values: val.map(toFirestoreValue) } };
-        if (typeof val === 'object') {
-          if (val._seconds !== undefined) return { timestampValue: new Date(val._seconds * 1000).toISOString() };
-          return { mapValue: { fields: Object.fromEntries(Object.entries(val).map(([k, v]) => [k, toFirestoreValue(v)])) } };
+      if (req.method === "POST" && resource === "create-user") {
+        const { email, password, displayName, role = "STUDENT" } = req.body;
+        if (!email || !password || !displayName) {
+          return res.status(400).json({ error: "email, password and displayName are required" });
         }
-        return { stringValue: String(val) };
-      };
-
-      console.log("API: Creating Firestore record via REST API with Admin Token...");
-      try {
-        const firestoreData = {
-          fields: {
-            uid: { stringValue: uid },
-            email: { stringValue: email },
-            displayName: { stringValue: displayName },
-            role: { stringValue: role || "STUDENT" },
-            createdAt: { timestampValue: new Date().toISOString() }
-          }
-        };
-
-        const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
-        const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/${dbId}/documents/users/${uid}?updateMask.fieldPaths=uid&updateMask.fieldPaths=email&updateMask.fieldPaths=displayName&updateMask.fieldPaths=role&updateMask.fieldPaths=createdAt`;
-        
-        const fsResponse = await fetch(firestoreUrl, {
-          method: 'PATCH', // Use PATCH to create or update
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': req.headers.authorization || ''
-          },
-          body: JSON.stringify(firestoreData)
+        const allowedRoles = ["ADMIN", "INSTRUCTOR", "STUDENT"];
+        if (!allowedRoles.includes(role)) {
+          return res.status(400).json({ error: `role must be one of ${allowedRoles.join(", ")}` });
+        }
+        const userRecord = await auth.createUser({ email, password, displayName });
+        await db.collection("users").doc(userRecord.uid).set({
+          uid: userRecord.uid, email, displayName, role,
+          createdAt: FieldValue.serverTimestamp(),
         });
-
-        if (!fsResponse.ok) {
-          const fsError = await fsResponse.json();
-          console.error("Firestore REST Error:", fsError);
-          throw new Error(fsError.error?.message || "Failed to create Firestore record via REST API");
-        }
-
-        console.log("API: Firestore record created successfully via REST API");
-      } catch (fsError: any) {
-        console.error("API: Firestore REST error:", fsError.message);
-        throw fsError;
+        return res.json({ uid: userRecord.uid });
       }
 
-      res.json({ uid });
-    } catch (error: any) {
-      console.error("API: create-user error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post("/api/admin/update-user-role", verifyAdmin, async (req, res) => {
-    try {
-      const { uid, role } = req.body;
-      await db.collection("users").doc(uid).update({ role });
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.delete("/api/admin/users/:uid", verifyAdmin, async (req, res) => {
-    try {
-      const { uid } = req.params;
-      console.log(`API: delete-user request for UID: ${uid}`);
-
-      if (!auth) {
-        throw new Error("Auth service not initialized");
+      if (req.method === "POST" && resource === "update-user-role") {
+        const { uid, role } = req.body;
+        if (!uid || !role) return res.status(400).json({ error: "uid and role are required" });
+        const allowedRoles = ["ADMIN", "INSTRUCTOR", "STUDENT"];
+        if (!allowedRoles.includes(role)) {
+          return res.status(400).json({ error: `role must be one of ${allowedRoles.join(", ")}` });
+        }
+        await db.collection("users").doc(uid).update({ role });
+        return res.json({ success: true });
       }
 
-      // 1. Delete from Firebase Auth
-      console.log("API: Deleting user from Firebase Auth...");
-      try {
-        await auth.deleteUser(uid);
-        console.log("API: User deleted from Firebase Auth");
-      } catch (authError: any) {
-        console.error("API: Firebase Auth Delete Error:", authError.message);
-        
-        const isApiDisabledError = authError.message.includes('Identity Toolkit API') || 
-                                  authError.message.includes('148520817040') ||
-                                  authError.code === 'auth/internal-error';
-        
-        const isPermissionError = authError.code === 'auth/insufficient-permission' || 
-                                 authError.message.includes('permission');
-
-        if (isApiDisabledError || isPermissionError) {
-          console.warn("API: Auth delete failed due to API/Permission issues, proceeding to Firestore delete anyway...");
-        } else if (authError.code !== 'auth/user-not-found') {
-          throw authError;
+      if (req.method === "DELETE" && resource === "delete-user") {
+        const uid = req.query.uid as string;
+        if (!uid) return res.status(400).json({ error: "uid query param is required" });
+        try {
+          await auth.deleteUser(uid);
+        } catch (e: any) {
+          if (e.code !== "auth/user-not-found") console.error("[admin] Auth delete failed:", e.message);
         }
+        await db.collection("users").doc(uid).delete();
+        return res.json({ success: true });
       }
 
-      // 2. Delete from Firestore using REST API
-      console.log("API: Deleting Firestore record via REST API...");
-      const firebaseConfig = firebaseAppletConfig;
-      const dbId = firebaseConfig.firestoreDatabaseId || '(default)';
-      const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/${dbId}/documents/users/${uid}`;
-      
-      const fsResponse = await fetch(firestoreUrl, {
-        method: 'DELETE',
-        headers: { 
-          'Authorization': req.headers.authorization || ''
-        }
-      });
-
-      if (!fsResponse.ok) {
-        const fsError = await fsResponse.json();
-        console.error("Firestore REST Delete Error:", fsError);
-        // If document doesn't exist, we can consider it a success for deletion purposes
-        if (fsResponse.status !== 404) {
-          throw new Error(fsError.error?.message || "Failed to delete Firestore record via REST API");
-        }
+      if (req.method === "POST" && resource === "upload") {
+        if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+        const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+        return res.json({ url: fileUrl, filename: req.file.filename });
       }
 
-      console.log("API: Firestore record deleted successfully");
-      res.json({ success: true });
-    } catch (error: any) {
-      console.error("API: delete-user error:", error);
-      res.status(500).json({ error: error.message });
+      if (req.method === "POST" && resource === "sync-courses") {
+        const { courses: courseList } = req.body;
+        if (!Array.isArray(courseList) || courseList.length === 0) {
+          return res.status(400).json({ error: "courses array is required" });
+        }
+        let synced = 0;
+        const errors: string[] = [];
+        for (const course of courseList) {
+          if (!course.id) { errors.push(`Course missing id: ${course.title}`); continue; }
+          try {
+            await db.collection("courses").doc(course.id).set(
+              { ...course, updatedAt: FieldValue.serverTimestamp() },
+              { merge: true }
+            );
+            synced++;
+          } catch (e: any) {
+            errors.push(`${course.id}: ${e.message}`);
+          }
+        }
+        return res.json({ success: true, synced, errors: errors.length > 0 ? errors : undefined });
+      }
+
+      if (req.method === "POST" && resource === "sync-users") {
+        const adminEmail = process.env.ADMIN_EMAIL ?? "";
+        const created: string[] = [];
+        const skipped: string[] = [];
+        const errors: string[] = [];
+        let nextPageToken: string | undefined;
+        do {
+          const result = await auth.listUsers(1000, nextPageToken);
+          nextPageToken = result.pageToken;
+          for (const u of result.users) {
+            try {
+              const docRef = db.collection("users").doc(u.uid);
+              if ((await docRef.get()).exists) { skipped.push(u.uid); continue; }
+              await docRef.set({
+                uid: u.uid,
+                email: u.email ?? "",
+                displayName: u.displayName ?? u.email?.split("@")[0] ?? "User",
+                role: adminEmail && u.email === adminEmail ? "ADMIN" : "STUDENT",
+                createdAt: u.metadata.creationTime ? new Date(u.metadata.creationTime) : FieldValue.serverTimestamp(),
+                lastLogin: u.metadata.lastSignInTime ? new Date(u.metadata.lastSignInTime) : null,
+                provider: u.providerData?.[0]?.providerId ?? "password",
+                photoURL: u.photoURL ?? null,
+              });
+              created.push(u.email ?? u.uid);
+            } catch (e: any) {
+              errors.push(`${u.email ?? u.uid}: ${e.message}`);
+            }
+          }
+        } while (nextPageToken);
+        return res.json({
+          success: true,
+          created: created.length,
+          skipped: skipped.length,
+          errors: errors.length > 0 ? errors : undefined,
+          createdUsers: created,
+        });
+      }
+
+      return res.status(404).json({ error: `Unknown admin resource: "${resource}"` });
+    } catch (err: any) {
+      console.error(`[admin] ${resource} error:`, err.message);
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -520,25 +533,88 @@ async function startServer() {
     }
   });
 
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const EMAIL_MAX_SUBJECT = 200;
+  const EMAIL_MAX_BODY = 20000;
+  const EMAIL_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+  const EMAIL_RATE_LIMIT_MAX = 5;
+
+  // Mirrors api/send-email.ts: 'self' emails always go to the authenticated
+  // caller's own verified address; 'public' emails (contact form, lead
+  // magnet) allow an arbitrary address but are validated and rate-limited
+  // by IP so this endpoint can't be scripted into a bulk spam relay.
+  async function checkEmailRateLimit(key: string): Promise<boolean> {
+    const ref = db.collection("emailRateLimits").doc(key);
+    const now = Date.now();
+    return db.runTransaction(async (tx: any) => {
+      const snap = await tx.get(ref);
+      const data = snap.exists ? snap.data() : null;
+      if (!data || now - data.windowStart > EMAIL_RATE_LIMIT_WINDOW_MS) {
+        tx.set(ref, { count: 1, windowStart: now });
+        return true;
+      }
+      if (data.count >= EMAIL_RATE_LIMIT_MAX) return false;
+      tx.set(ref, { count: data.count + 1, windowStart: data.windowStart });
+      return true;
+    });
+  }
+
   app.post("/api/send-email", async (req, res) => {
     try {
-      const { to, subject, text, html, from } = req.body;
-
       if (!resend) {
         console.warn("[Email] RESEND_API_KEY not configured — skipping");
         return res.status(200).json({ status: "skipped", message: "Email service not configured" });
       }
 
-      const fromEmail = from || process.env.RESEND_FROM_EMAIL || "info@mylearninglaunchpad.com";
+      const { context, to, subject, text, html } = req.body;
+      if (!subject || !text) {
+        return res.status(400).json({ error: "Missing required fields: subject, text" });
+      }
+      if (subject.length > EMAIL_MAX_SUBJECT || text.length > EMAIL_MAX_BODY || (html && html.length > EMAIL_MAX_BODY)) {
+        return res.status(400).json({ error: "subject/text/html exceeds allowed length" });
+      }
 
-      const { data, error } = await resend.emails.send({ from: fromEmail, to, subject, text, html });
+      let recipient: string;
+
+      if (context === "self") {
+        const authHeader = req.headers.authorization;
+        if (!authHeader?.startsWith("Bearer ")) {
+          return res.status(401).json({ error: "Unauthorized: missing Bearer token" });
+        }
+        if (!auth) return res.status(500).json({ error: "Firebase Admin not initialized" });
+        let decoded;
+        try {
+          decoded = await auth.verifyIdToken(authHeader.split("Bearer ")[1]);
+        } catch (err: any) {
+          return res.status(401).json({ error: `Invalid token: ${err.message}` });
+        }
+        if (!decoded.email) return res.status(400).json({ error: "Account has no email address" });
+        recipient = decoded.email;
+      } else if (context === "public") {
+        if (typeof to !== "string" || to.length >= 320 || !EMAIL_RE.test(to)) {
+          return res.status(400).json({ error: "A valid `to` address is required" });
+        }
+        if (!db) return res.status(500).json({ error: "Firebase Admin not initialized" });
+        const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() || req.ip || "unknown";
+        const allowed = await checkEmailRateLimit(ip);
+        if (!allowed) {
+          return res.status(429).json({ error: "Too many requests — please try again later" });
+        }
+        recipient = to;
+      } else {
+        return res.status(400).json({ error: "context must be 'self' or 'public'" });
+      }
+
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "info@mylearninglaunchpad.com";
+
+      const { data, error } = await resend.emails.send({ from: fromEmail, to: recipient, subject, text, html });
 
       if (error) {
         console.error("[Email] Resend error:", error);
         return res.status(500).json({ error: error.message });
       }
 
-      console.log(`[Email] Sent to ${to}: ${subject} (id: ${data?.id})`);
+      console.log(`[Email] Sent to ${recipient}: ${subject} (id: ${data?.id})`);
       res.json({ status: "success", id: data?.id });
     } catch (error: any) {
       console.error("[Email] Unexpected error:", error.message);

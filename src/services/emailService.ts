@@ -1,4 +1,11 @@
+import { auth } from '../firebase';
+
 export interface EmailParams {
+  // 'self' — an account-notification email to the signed-in user's own
+  // verified address; the server ignores `to` and requires a valid session.
+  // 'public' — a public-form email (contact, lead magnet) to an address a
+  // logged-out visitor typed in; validated and rate-limited server-side.
+  context: 'self' | 'public';
   to: string;
   subject: string;
   text: string;
@@ -7,11 +14,16 @@ export interface EmailParams {
 
 export const sendEmail = async (params: EmailParams) => {
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (params.context === 'self') {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (!idToken) throw new Error('Not signed in');
+      headers.Authorization = `Bearer ${idToken}`;
+    }
+
     const response = await fetch('/api/send-email', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(params),
     });
 

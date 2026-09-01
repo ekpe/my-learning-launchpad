@@ -108,9 +108,15 @@ service cloud.firestore {
     match /enrollments/{enrollmentId} {
       allow read: if isAuthenticated() && (request.auth.uid == resource.data.userId || isInstructor());
 
+      // Clients may only self-enroll directly for courses flagged free in
+      // Firestore. Paid enrollments are written exclusively by trusted
+      // server code (the Stripe webhook and /api/verify-enrollment) using
+      // the Admin SDK, which bypasses these rules — a client can never
+      // grant itself a paid enrollment by calling setDoc directly.
       allow create: if isAuthenticated() &&
                       isValidEnrollment(request.resource.data) &&
-                      request.resource.data.userId == request.auth.uid;
+                      request.resource.data.userId == request.auth.uid &&
+                      get(/databases/$(database)/documents/courses/$(request.resource.data.courseId)).data.isFree == true;
 
       allow update: if isAuthenticated() &&
                       (request.auth.uid == resource.data.userId || isAdmin()) &&

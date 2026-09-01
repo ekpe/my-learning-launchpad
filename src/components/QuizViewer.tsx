@@ -103,6 +103,7 @@ export const QuizViewer = () => {
       // Send email notification if failed
       if (!passed && user.email) {
         await sendEmail({
+          context: 'self',
           to: user.email,
           subject: `Quiz Update: ${quiz.title}`,
           text: `Hi ${user.displayName || 'Student'},\n\nYou recently took the quiz "${quiz.title}" in the course "${course.title}".\n\nYour score: ${correctCount}/${totalQuestions} (${Math.round((correctCount / totalQuestions) * 100)}%)\nStatus: Failed\n\nDon't worry! You can retry the quiz anytime to improve your score.`,

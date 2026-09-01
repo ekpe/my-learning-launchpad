@@ -116,6 +116,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         upsertProfile(user.uid, name, email)
           .catch(err => console.error('[AuthModal] Profile upsert failed:', err));
         sendEmail({
+          context: 'self',
           to: email,
           subject: 'Welcome to My Learning Launchpad!',
           text: `Hi ${name},\n\nWelcome! We're excited to have you on board.\n\nBest regards,\nThe My Learning Launchpad Team`,
