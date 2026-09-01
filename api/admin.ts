@@ -11,11 +11,10 @@
  *   POST   /api/admin?resource=sync-users
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { auth, db, FieldValue, adminInitError } from "./_lib/firebase-admin";
+import { auth, db, FieldValue, adminInitError, getAdminApp } from "./_lib/firebase-admin";
 import { withAdmin } from "./_lib/with-admin";
 import { handleOptions } from "./_lib/cors";
 import { getStorage } from "firebase-admin/storage";
-import { getAdminApp } from "./_lib/firebase-admin";
 import { v4 as uuidv4 } from "uuid";
 
 export const config = { api: { bodyParser: false } };
