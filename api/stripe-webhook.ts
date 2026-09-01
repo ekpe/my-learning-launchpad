@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import Stripe from "stripe";
-import { db, FieldValue } from "./_lib/firebase-admin";
+import { db, FieldValue } from "./_lib/firebase-admin.js";
 
 /**
  * IMPORTANT: Vercel must forward the raw request body for signature verification.

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import Stripe from "stripe";
-import { auth, db, FieldValue, adminInitError } from "./_lib/firebase-admin";
-import { handleOptions } from "./_lib/cors";
+import { auth, db, FieldValue, adminInitError } from "./_lib/firebase-admin.js";
+import { handleOptions } from "./_lib/cors.js";
 
 /**
  * Confirms a Stripe checkout session actually belongs to the caller and was

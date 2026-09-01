@@ -11,9 +11,9 @@
  *   POST   /api/admin?resource=sync-users
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { auth, db, FieldValue, adminInitError, getAdminApp } from "./_lib/firebase-admin";
-import { withAdmin } from "./_lib/with-admin";
-import { handleOptions } from "./_lib/cors";
+import { auth, db, FieldValue, adminInitError, getAdminApp } from "./_lib/firebase-admin.js";
+import { withAdmin } from "./_lib/with-admin.js";
+import { handleOptions } from "./_lib/cors.js";
 import { getStorage } from "firebase-admin/storage";
 import { v4 as uuidv4 } from "uuid";
 

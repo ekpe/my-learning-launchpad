@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { withAdmin } from "./_lib/with-admin";
-import { handleOptions } from "./_lib/cors";
+import { withAdmin } from "./_lib/with-admin.js";
+import { handleOptions } from "./_lib/cors.js";
 
 // Diagnostic report for Firebase Admin setup. Gated behind withAdmin so it
 // isn't public — it discloses the service account's project id/client email

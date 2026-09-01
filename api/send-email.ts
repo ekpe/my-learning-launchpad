@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { handleOptions } from "./_lib/cors";
-import { auth, db } from "./_lib/firebase-admin";
+import { handleOptions } from "./_lib/cors.js";
+import { auth, db } from "./_lib/firebase-admin.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_SUBJECT = 200;
