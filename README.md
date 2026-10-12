@@ -95,6 +95,11 @@ Course price and `isFree` status are read from Firestore, not trusted from the b
 
 **Enrollment integrity:** the client never writes a paid enrollment directly. Firestore rules only allow a client-side enrollment `create` when the referenced course is flagged `isFree`; paid enrollments are written exclusively by `stripe-webhook.ts` or `verify-enrollment.ts`, both of which use the Admin SDK (bypassing rules) after independently confirming payment with Stripe.
 
+## Webinar funnel
+
+The `/webinar` registration funnel (landing page, registration API, reminders, admin tab) is documented in
+[docs/WEBINAR.md](docs/WEBINAR.md), including setup, environment variables, testing report and launch blockers.
+
 ## File Storage
 
 The admin file upload uses **Firebase Storage** in production (which doesn't persist on serverless) and local disk under `uploads/` in `dev:server`. Make sure `FIREBASE_STORAGE_BUCKET` is set in your Vercel env vars.

@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Linkedin, Twitter, Facebook, Instagram, Rocket } from 'lucide-react';
 import { courses } from '../data/courses';
+import { requestConsentReopen } from '../services/consent';
 
 export const Footer = () => {
   return (
@@ -21,15 +22,15 @@ export const Footer = () => {
               Empowering global leaders to master the strategic implementation of Artificial Intelligence for business transformation and sustainable growth.
             </p>
             <div className="flex gap-4">
-              <a href="#" className="hover:text-amber-500 transition-colors"><Linkedin className="w-5 h-5" /></a>
-              <a href="#" className="hover:text-amber-500 transition-colors"><Twitter className="w-5 h-5" /></a>
-              <a href="#" className="hover:text-amber-500 transition-colors"><Facebook className="w-5 h-5" /></a>
-              <a href="#" className="hover:text-amber-500 transition-colors"><Instagram className="w-5 h-5" /></a>
+              <a href="#" aria-label="LinkedIn" className="hover:text-amber-500 transition-colors"><Linkedin className="w-5 h-5" /></a>
+              <a href="#" aria-label="X (Twitter)" className="hover:text-amber-500 transition-colors"><Twitter className="w-5 h-5" /></a>
+              <a href="#" aria-label="Facebook" className="hover:text-amber-500 transition-colors"><Facebook className="w-5 h-5" /></a>
+              <a href="#" aria-label="Instagram" className="hover:text-amber-500 transition-colors"><Instagram className="w-5 h-5" /></a>
             </div>
           </div>
 
           <div>
-            <h4 className="text-white font-bold mb-6">Quick Links</h4>
+            <h3 className="text-white font-bold mb-6">Quick Links</h3>
             <ul className="space-y-4 text-sm">
               <li><Link to="/" className="hover:text-amber-500 transition-colors">Home</Link></li>
               <li><a href="/#courses" className="hover:text-amber-500 transition-colors">Courses</a></li>
@@ -39,7 +40,7 @@ export const Footer = () => {
           </div>
 
           <div>
-            <h4 className="text-white font-bold mb-6">Programs</h4>
+            <h3 className="text-white font-bold mb-6">Programs</h3>
             <ul className="space-y-4 text-sm">
               {courses.map(course => (
                 <li key={course.id}>
@@ -52,7 +53,7 @@ export const Footer = () => {
           </div>
 
           <div>
-            <h4 className="text-white font-bold mb-6">Newsletter</h4>
+            <h3 className="text-white font-bold mb-6">Newsletter</h3>
             <p className="text-sm mb-4">Stay updated with the latest in AI strategy and executive education.</p>
             <div className="flex gap-2">
               <input 
@@ -70,9 +71,10 @@ export const Footer = () => {
         <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs">
           <p>© 2026 My Learning Launchpad. All rights reserved.</p>
           <div className="flex gap-6">
-            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
+            <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
             <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-white transition-colors">Cookie Policy</a>
+            <Link to="/privacy#cookies" className="hover:text-white transition-colors">Cookie Policy</Link>
+            <button type="button" onClick={requestConsentReopen} className="hover:text-white transition-colors">Cookie settings</button>
           </div>
         </div>
       </div>

@@ -38,6 +38,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/Button';
 import { courses as staticCourses } from '../data/courses';
+import { WebinarAdmin } from './admin/WebinarAdmin';
 import { UserProfile, Enrollment, Course } from '../types';
 
 import { 
@@ -55,7 +56,7 @@ import {
   Pie
 } from 'recharts';
 
-type AdminTab = 'users' | 'courses' | 'enrollments' | 'analytics';
+type AdminTab = 'users' | 'courses' | 'enrollments' | 'analytics' | 'webinars';
 
 // Safely parse API responses — Vercel can return HTML error pages on 500s
 async function safeJson(response: Response): Promise<any> {
@@ -833,6 +834,18 @@ export const AdminDashboard: React.FC = () => {
               <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-900" />
             )}
           </button>
+          <button
+            onClick={() => setActiveTab('webinars')}
+            className={`flex items-center gap-2 px-6 py-4 font-medium transition-all relative ${
+              activeTab === 'webinars' ? 'text-blue-900' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Video className="w-4 h-4" />
+            Webinars
+            {activeTab === 'webinars' && (
+              <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-900" />
+            )}
+          </button>
         </div>
 
         {/* Content */}
@@ -1287,6 +1300,8 @@ export const AdminDashboard: React.FC = () => {
               </table>
             </div>
           )}
+
+          {activeTab === 'webinars' && <WebinarAdmin />}
 
           {activeTab === 'analytics' && (
             <div className="p-8 space-y-12">

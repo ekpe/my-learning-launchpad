@@ -1,6 +1,6 @@
 {
   "framework": "vite",
-  "buildCommand": "vite build",
+  "buildCommand": "vite build && node scripts/prerender-webinar.mjs",
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/api/health",                    "destination": "/api/health" },
@@ -10,6 +10,7 @@
     { "source": "/api/verify-enrollment",         "destination": "/api/verify-enrollment" },
     { "source": "/api/stripe-webhook",            "destination": "/api/stripe-webhook" },
     { "source": "/api/send-email",                "destination": "/api/send-email" },
+    { "source": "/api/webinar",                   "destination": "/api/webinar" },
     { "source": "/api/auth/login",                "destination": "/api/auth-login" },
     { "source": "/api/admin",                     "destination": "/api/admin" },
     { "source": "/(.*)",                          "destination": "/index.html" }

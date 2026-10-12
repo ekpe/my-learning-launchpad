@@ -9,6 +9,9 @@
  *   DELETE /api/admin?resource=delete-user&uid=:uid
  *   POST   /api/admin?resource=upload
  *   POST   /api/admin?resource=sync-users
+ *   GET    /api/admin?resource=webinar-get&eventId=:id
+ *   POST   /api/admin?resource=webinar-save | webinar-reschedule | webinar-broadcast |
+ *                              webinar-refresh-delivery | webinar-mark-attended
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { auth, db, FieldValue, adminInitError, getAdminApp } from "./_lib/firebase-admin.js";
@@ -16,6 +19,7 @@ import { withAdmin } from "./_lib/with-admin.js";
 import { handleOptions } from "./_lib/cors.js";
 import { getStorage } from "firebase-admin/storage";
 import { v4 as uuidv4 } from "uuid";
+import { broadcast, getWebinar, markAttended, refreshDelivery, rescheduleReminders, saveWebinar } from "./_lib/webinar-admin.js";
 
 export const config = { api: { bodyParser: false } };
 
@@ -204,6 +208,23 @@ export default withAdmin(async (req: VercelRequest, res: VercelResponse) => {
     if (req.method === "POST"   && resource === "upload")           return await uploadFile(req, res);
     if (req.method === "POST"   && resource === "sync-courses")     return await syncCourses(req, res);
     if (req.method === "POST"   && resource === "sync-users")       return await syncUsers(req, res);
+
+    // Webinar registrant operations (see api/_lib/webinar-admin.ts)
+    if (req.method === "GET" && resource === "webinar-get") {
+      const out = await getWebinar(req.query);
+      return res.status(out.status).json(out.body);
+    }
+    const webinarOps: Record<string, (body: any) => Promise<{ status: number; body: Record<string, unknown> }>> = {
+      "webinar-save": saveWebinar,
+      "webinar-reschedule": rescheduleReminders,
+      "webinar-broadcast": broadcast,
+      "webinar-refresh-delivery": refreshDelivery,
+      "webinar-mark-attended": markAttended,
+    };
+    if (req.method === "POST" && webinarOps[resource]) {
+      const out = await webinarOps[resource](await parseJsonBody(req));
+      return res.status(out.status).json(out.body);
+    }
 
     return res.status(404).json({ error: `Unknown admin resource: "${resource}"` });
   } catch (err: any) {

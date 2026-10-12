@@ -6,12 +6,14 @@
   "scripts": {
     "dev": "vite",
     "start": "node server.ts",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender-webinar.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "vercel-build": "vite build",
-    "dev:server": "tsx server.ts"
+    "vercel-build": "vite build && node scripts/prerender-webinar.mjs",
+    "dev:server": "tsx server.ts",
+    "test": "node scripts/run-tests.mjs",
+    "webinar:local": "node scripts/webinar-local.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",

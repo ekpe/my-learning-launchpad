@@ -16,9 +16,17 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
   const allOk = Object.values(checks).every(Boolean);
 
+  // Webinar funnel settings. Reported for visibility but kept out of `ok` so
+  // the existing health signal doesn't change meaning.
+  const webinar = {
+    fromEmail: !!(process.env.WEBINAR_FROM_EMAIL || process.env.RESEND_FROM_EMAIL),
+    tokenSecret: !!process.env.WEBINAR_TOKEN_SECRET, // required for promotional email unsubscribe links
+  };
+
   res.status(allOk ? 200 : 503).json({
     ok: allOk,
     checks,
+    webinar,
     ...(adminInitError ? { firebaseAdminError: adminInitError } : {}),
   });
 }

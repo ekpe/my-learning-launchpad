@@ -21,6 +21,11 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
+      // Optional: forward /api to a local backend (e.g. the webinar test harness).
+      // `api/_lib/*` files are also imported as modules by src/, so those stay with Vite.
+      proxy: process.env.API_PROXY
+        ? { '/api': { target: process.env.API_PROXY, bypass: (req) => (req.url?.startsWith('/api/_lib/') ? req.url : undefined) } }
+        : undefined,
     },
     build: {
       rollupOptions: {

@@ -168,6 +168,15 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // Webinars: the public schedule/status is readable by the landing page.
+    // All writes happen server-side (Admin SDK via /api/admin), so clients can never write.
+    // webinarPrivate (Google Meet link), webinarRegistrations (attendee data) and
+    // webinarRateLimits are server-only and fall through to the default deny below.
+    match /webinars/{eventId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Default deny
     match /{document=**} {
       allow read, write: if false;

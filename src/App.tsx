@@ -22,6 +22,10 @@ import { QuizViewer } from './components/QuizViewer';
 import { InstructorDashboard } from './components/InstructorDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { Certificate } from './components/Certificate';
+import { WebinarPage } from './components/webinar/WebinarPage';
+import { WebinarThankYou } from './components/webinar/WebinarThankYou';
+import { PrivacyPolicy } from './components/PrivacyPolicy';
+import { ConsentBanner } from './components/ConsentBanner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -224,6 +228,20 @@ const PageTracker = () => {
   return null;
 };
 
+// Lets keyboard users jump past the fixed navbar on pages that mark their <main id="main">.
+const SkipLink = () => {
+  const { pathname } = useLocation();
+  if (!pathname.startsWith('/webinar') && pathname !== '/privacy') return null;
+  return (
+    <a
+      href="#main"
+      className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[70] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:font-semibold focus:text-blue-900 focus:shadow-lg"
+    >
+      Skip to main content
+    </a>
+  );
+};
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -232,9 +250,13 @@ export default function App() {
           <ScrollToTop />
           <PageTracker />
           <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900">
+            <SkipLink />
             <Navbar />
             <Routes>
               <Route path="/" element={<HomePage />} />
+              <Route path="/webinar" element={<WebinarPage />} />
+              <Route path="/webinar/thank-you" element={<WebinarThankYou />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/course/:id" element={<CourseDetail />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
               
@@ -295,6 +317,7 @@ export default function App() {
               />
             </Routes>
             <Footer />
+            <ConsentBanner />
           </div>
         </Router>
       </AuthProvider>
