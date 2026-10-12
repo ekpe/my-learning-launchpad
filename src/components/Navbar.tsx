@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Button } from './ui/Button';
 import { Menu, X, Rocket, User as UserIcon, LogOut } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
@@ -13,6 +13,7 @@ export const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const { user, profile } = useAuth();
+  const onDarkHero = useLocation().pathname === '/webinar';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -42,7 +43,7 @@ export const Navbar = () => {
       <nav
         className={cn(
           'fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-6 py-4',
-          isScrolled ? 'bg-white/90 backdrop-blur-md shadow-sm py-3' : 'bg-transparent'
+          isScrolled || onDarkHero ? 'bg-cream/95 backdrop-blur-md shadow-sm py-3' : 'bg-transparent'
         )}
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -54,7 +55,10 @@ export const Navbar = () => {
               "text-xl font-bold tracking-tight",
               isScrolled ? "text-blue-900" : "text-blue-900"
             )}>
-              MY LEARNING<span className="text-amber-600 ml-1">LAUNCHPAD</span>
+              MY LEARNING<span className={cn('ml-1', onDarkHero ? 'text-amber-700' : 'text-amber-600')}>LAUNCHPAD</span>
+              {onDarkHero && (
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-600">AI Leadership Academy</span>
+              )}
             </span>
           </Link>
 

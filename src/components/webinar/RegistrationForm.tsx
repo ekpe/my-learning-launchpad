@@ -17,7 +17,7 @@ interface Props {
 
 const inputClass =
   'scroll-mt-28 w-full rounded-xl border bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 shadow-sm ' +
-  'focus:border-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-900/40';
+  'focus:border-navy-900 focus:outline-none focus:ring-2 focus:ring-navy-900/40';
 
 const REQUEST_TIMEOUT_MS = 20_000;
 
@@ -176,7 +176,7 @@ export const RegistrationForm: React.FC<Props> = ({ config, mode, variant = 'ful
       </div>
 
       <details className="group mt-5 rounded-xl border border-slate-200 bg-slate-50/60 open:bg-white">
-        <summary className="cursor-pointer select-none rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-900">
+        <summary className="cursor-pointer select-none rounded-xl px-4 py-3 text-sm font-semibold text-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy-900">
           Tell us a bit more <span className="font-normal text-slate-500">(optional)</span>
         </summary>
         <div className={`grid gap-5 px-4 pb-5 pt-2 ${compact ? '' : 'sm:grid-cols-2'}`}>
@@ -218,7 +218,7 @@ export const RegistrationForm: React.FC<Props> = ({ config, mode, variant = 'ful
       <p className="mt-6 text-sm leading-relaxed text-slate-600">
         By registering, you agree that MyLearningLaunchpad may use your details to run this webinar and to email you
         confirmations, reminders and joining instructions. See our{' '}
-        <Link to="/privacy" className="font-semibold text-blue-900 underline underline-offset-2">Privacy Policy</Link>.
+        <Link to="/privacy" className="font-semibold text-navy-900 underline underline-offset-2">Privacy Policy</Link>.
       </p>
 
       <label htmlFor={`${p}-marketing`} className="mt-4 flex cursor-pointer items-start gap-3 text-sm leading-relaxed text-slate-700">
@@ -227,7 +227,7 @@ export const RegistrationForm: React.FC<Props> = ({ config, mode, variant = 'ful
           type="checkbox"
           checked={marketingOptIn}
           onChange={(e) => setMarketingOptIn(e.target.checked)}
-          className="mt-0.5 h-5 w-5 shrink-0 rounded border-slate-400 text-blue-900 focus:ring-2 focus:ring-blue-900/40"
+          className="mt-0.5 h-5 w-5 shrink-0 rounded border-slate-400 text-navy-900 focus:ring-2 focus:ring-navy-900/40"
         />
         <span>
           Also send me occasional updates about MyLearningLaunchpad courses and AI leadership learning.{' '}
@@ -238,7 +238,7 @@ export const RegistrationForm: React.FC<Props> = ({ config, mode, variant = 'ful
       <button
         type="submit"
         disabled={submitting}
-        className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-full bg-blue-900 px-8 py-4 text-base font-bold text-white shadow-lg shadow-blue-900/20 transition-colors hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-900 disabled:cursor-not-allowed disabled:opacity-70"
+        className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-full bg-navy-900 px-8 py-4 text-base font-bold text-white shadow-lg shadow-navy-900/20 transition-colors hover:bg-navy-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-900 disabled:cursor-not-allowed disabled:opacity-70"
       >
         {submitting ? (
           <>

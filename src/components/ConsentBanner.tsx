@@ -36,7 +36,7 @@ export const ConsentBanner = () => {
         <p className="text-sm text-slate-700 leading-relaxed">
           We'd like to use analytics cookies to understand how people find and use this site. They stay off unless you
           accept. See our{' '}
-          <Link to="/privacy#cookies" className="font-semibold text-blue-900 underline underline-offset-2">
+          <Link to="/privacy#cookies" className="font-semibold text-navy-900 underline underline-offset-2">
             Privacy &amp; Cookie Policy
           </Link>
           .
@@ -45,7 +45,7 @@ export const ConsentBanner = () => {
           <button
             type="button"
             onClick={() => choose(false)}
-            className="flex-1 rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-900 sm:flex-none"
+            className="flex-1 rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-900 sm:flex-none"
           >
             Decline
           </button>
@@ -53,7 +53,7 @@ export const ConsentBanner = () => {
             ref={acceptRef}
             type="button"
             onClick={() => choose(true)}
-            className="flex-1 rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-900 sm:flex-none"
+            className="flex-1 rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-900 sm:flex-none"
           >
             Accept analytics
           </button>

@@ -1,9 +1,33 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarClock, Check, ChevronDown, Clock, MonitorPlay, Users } from 'lucide-react';
+import {
+  ArrowRight,
+  Award,
+  BookOpen,
+  Bot,
+  CalendarClock,
+  ChartColumn,
+  Check,
+  ChevronDown,
+  Clock,
+  FlaskConical,
+  GraduationCap,
+  HeartHandshake,
+  Landmark,
+  Lightbulb,
+  Presentation,
+  Rocket,
+  Settings,
+  ShieldCheck,
+  Target,
+  Ticket,
+  TrendingUp,
+  Users,
+  Video,
+  type LucideIcon,
+} from 'lucide-react';
 import { courses } from '../../data/courses';
 import {
-  DEFAULT_AGENDA,
   DEFAULT_EVENT_ID,
   DEFAULT_SUBTITLE,
   DEFAULT_TITLE,
@@ -21,7 +45,9 @@ import { captureAttribution, withAttribution } from '../../services/attribution'
 import { trackWebinar } from '../../services/webinarAnalytics';
 import { RegistrationForm } from './RegistrationForm';
 
-const PHOTO = '/images/prof_ekpe_okorafor.jpg';
+// Optimized copies of the portrait (the original is ~6 MB). WebP first, JPEG fallback.
+const PHOTO_WEBP = '/images/prof_ekpe_okorafor-1100.webp';
+const PHOTO_JPG = '/images/prof_ekpe_okorafor-1100.jpg';
 const SITE = 'https://www.mylearninglaunchpad.com';
 
 const PAGE_DESCRIPTION =
@@ -36,11 +62,76 @@ const Eyebrow = ({ children }: { children: React.ReactNode }) => (
 const SectionHeading = ({ eyebrow, children, id }: { eyebrow?: string; children: React.ReactNode; id?: string }) => (
   <div className="mx-auto mb-12 max-w-3xl text-center">
     {eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}
-    <h2 id={id} className="text-balance text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+    <h2 id={id} className="text-balance text-3xl font-bold tracking-tight text-navy-950 sm:text-4xl">
       {children}
     </h2>
   </div>
 );
+
+/** "Leading in the Age of AI: From Hype to Strategy" → three lines with the middle one in gold. Other titles render plainly. */
+function HeroTitle({ title }: { title: string }) {
+  const m = /^(.*?)(Age of AI:)s*(.*)$/i.exec(title);
+  if (!m || !m[1].trim()) return <>{title}</>;
+  return (
+    <>
+      <span className="block">{m[1].trim()}</span>
+      <span className="block text-gold-400">{m[2]}</span>
+      <span className="mt-1 block text-[0.62em] leading-tight">{m[3]}</span>
+    </>
+  );
+}
+
+const SECTORS: { key: string; label: string; Icon: LucideIcon; className?: string; tint: string }[] = [
+  { key: 'academia', label: 'Academia', Icon: GraduationCap, className: 'col-span-2', tint: 'from-[#2c4f86] via-[#183a73] to-[#0b1f47]' },
+  { key: 'government', label: 'Government', Icon: Landmark, tint: 'from-[#35609a] to-[#10294f]' },
+  { key: 'smes-startups', label: 'SMEs & Startups', Icon: Rocket, tint: 'from-[#84591f] to-[#2b1d0c]' },
+  { key: 'nonprofits', label: 'Nonprofits', Icon: HeartHandshake, tint: 'from-[#6d5424] to-[#231a09]' },
+  { key: 'research', label: 'Research', Icon: FlaskConical, tint: 'from-[#1f5a78] to-[#0b2236]' },
+  { key: 'education-professionals', label: 'Education & Professionals', Icon: Users, className: 'col-span-2', tint: 'from-[#3a4f8f] via-[#233a73] to-[#0c1d45]' },
+];
+
+/**
+ * Gradient + icon tile. To use a real photo, drop a file at /public/images/webinar/<key>.jpg
+ * (e.g. academia.jpg); it layers over the gradient automatically. Without a file the tile stays as is.
+ */
+function SectorTile({ s }: { s: (typeof SECTORS)[number] }) {
+  return (
+    <li className={`relative isolate min-h-[7.5rem] overflow-hidden bg-gradient-to-br ${s.tint} ${s.className ?? ''}`}>
+      <s.Icon aria-hidden="true" className="absolute right-5 top-1/2 h-16 w-16 -translate-y-1/2 text-white/15" />
+      <img
+        src={`/images/webinar/${s.key}.jpg`}
+        alt=""
+        loading="lazy"
+        onError={(e) => e.currentTarget.remove()}
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-navy-950/80 via-navy-950/10 to-transparent" />
+      <span className="absolute bottom-3 left-4 text-xs font-bold uppercase tracking-wider text-white sm:left-5 lg:left-8 lg:text-[0.8rem]">{s.label}</span>
+    </li>
+  );
+}
+
+const PHOTO_FADE =
+  'linear-gradient(to right, transparent 0%, #000 20%, #000 80%, transparent 100%), linear-gradient(to bottom, transparent 0%, #000 12%, #000 74%, transparent 100%)';
+const photoMask: React.CSSProperties = {
+  WebkitMaskImage: PHOTO_FADE,
+  WebkitMaskComposite: 'source-in',
+  maskImage: PHOTO_FADE,
+  maskComposite: 'intersect',
+};
+
+const JOURNEY_ICONS: Record<string, LucideIcon> = {
+  'ai-strategy-leaders': BookOpen,
+  'ai-strategy-intensive': Presentation,
+  'ai-strategy-certification': Award,
+  'enterprise-ai-implementation': Settings,
+  'leading-agentic-ai': Bot,
+};
+
+const splitTitle = (t: string): [string, string] => {
+  const i = t.indexOf(':');
+  return i < 0 ? [t, ''] : [t.slice(0, i).trim(), t.slice(i + 1).trim()];
+};
 
 function useVisitorLocalTime(config: WebinarConfig | null): string | null {
   if (!config?.startsAt) return null;
@@ -67,7 +158,7 @@ function EventJsonLd({ config }: { config: WebinarConfig }) {
       eventAttendanceMode: 'https://schema.org/OnlineEventAttendanceMode',
       // The page URL, never the private Google Meet link.
       location: { '@type': 'VirtualLocation', url: `${SITE}/webinar` },
-      image: [`${SITE}${PHOTO}`],
+      image: [`${SITE}${PHOTO_JPG}`],
       organizer: { '@type': 'Organization', name: 'MyLearningLaunchpad', url: SITE },
       performer: { '@type': 'Person', name: 'Ekpe Okorafor' },
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD', availability: 'https://schema.org/InStock', url: `${SITE}/webinar` },
@@ -113,32 +204,12 @@ function useStickyCta(heroCtaRef: React.RefObject<HTMLElement | null>) {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-const AUDIENCES = [
-  'Government and public-sector leaders',
-  'Small and medium-sized business owners and managers',
-  'University and academic leaders',
-  'Nonprofit and development-sector leaders',
-  'Startup founders and entrepreneurs',
-  'Research and innovation leaders',
-  'Education and technology leaders',
-  'Senior and mid-career professionals preparing to lead AI-enabled change',
-];
-
-const PROBLEMS = [
-  'Too many AI tools and competing claims',
-  'Pressure to adopt AI without a clear strategy',
-  'Uncertainty about AI agents and autonomous systems',
-  'Difficulty identifying worthwhile opportunities',
-  'Concerns about trust, accountability, and workforce implications',
-  'Limited time and resources for learning',
-];
-
-const OUTCOMES = [
-  { title: 'Understand the AI Shift', body: 'What has changed from generative AI to agentic AI, and why it matters.' },
-  { title: 'Separate Capability from Hype', body: 'Recognize what AI can do versus what it can do reliably.' },
-  { title: 'Spot Opportunities', body: 'Identify where AI might create practical value in your organization.' },
-  { title: 'Lead Responsible Adoption', body: 'Understand the importance of human judgment, oversight, and accountability.' },
-  { title: 'Define Your Next Step', body: 'Leave with a practical direction for your AI leadership journey.' },
+const OUTCOMES: { title: string; body: string; Icon: LucideIcon }[] = [
+  { title: 'Understand the AI Shift', body: 'What has changed from generative AI to agentic AI, and why it matters.', Icon: Lightbulb },
+  { title: 'Separate Capability from Hype', body: 'Recognize what AI can do versus what it can do reliably.', Icon: ChartColumn },
+  { title: 'Spot Opportunities', body: 'Identify where AI might create practical value in your organization.', Icon: Target },
+  { title: 'Lead Responsible Adoption', body: 'Understand the importance of human judgment, oversight, and accountability.', Icon: ShieldCheck },
+  { title: 'Define Your Next Step', body: 'Leave with a practical direction for your AI leadership journey.', Icon: TrendingUp },
 ];
 
 export const WebinarPage = () => {
@@ -194,266 +265,235 @@ export const WebinarPage = () => {
     },
   ];
 
+
   return (
     <main id="main" className="bg-white text-slate-900">
       {config && <EventJsonLd config={config} />}
 
       {/* 1 — Hero */}
-      <section aria-labelledby="hero-title" className="bg-gradient-to-b from-blue-50/70 to-white pb-16 pt-28 sm:pt-32 lg:pb-24">
-        <div className="mx-auto grid max-w-7xl items-center gap-10 px-6 lg:grid-cols-[minmax(0,1fr)_24rem] xl:grid-cols-[minmax(0,1fr)_26rem] xl:gap-14">
-          <div>
-            <Eyebrow>Free live AI leadership masterclass</Eyebrow>
-            <h1 id="hero-title" className="text-balance text-4xl font-bold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl">
-              {config?.title ?? DEFAULT_TITLE}
+      <section aria-labelledby="hero-title" className="relative overflow-hidden bg-navy-950 pt-20 text-white">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_68%_28%,rgba(24,58,115,0.65),transparent_62%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_8%_90%,rgba(233,164,45,0.12),transparent_48%)]" />
+        </div>
+
+        <div className="relative mx-auto grid max-w-[88rem] gap-8 px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-6 lg:px-8">
+          {/* Copy */}
+          <div className="py-6 lg:py-10 lg:pr-2">
+            <p className="inline-flex items-center gap-2.5 rounded-full bg-gold-500 px-4 py-2 text-xs font-extrabold uppercase tracking-wide text-navy-950 sm:text-sm">
+              <Video className="h-5 w-5 shrink-0" aria-hidden="true" />
+              Free live AI leadership masterclass
+            </p>
+            <h1 id="hero-title" className="mt-5 text-balance text-5xl font-extrabold leading-[1.04] tracking-tight sm:text-6xl xl:text-[3.7rem]">
+              <HeroTitle title={config?.title ?? DEFAULT_TITLE} />
             </h1>
-            <p className="mt-5 text-xl font-medium text-blue-900 xl:whitespace-nowrap xl:text-lg">{config?.subtitle ?? DEFAULT_SUBTITLE}</p>
-            <p className="mt-6 max-w-3xl text-lg leading-relaxed text-slate-700">
+            <p className="mt-5 max-w-xl text-lg font-semibold leading-snug text-white">{config?.subtitle ?? DEFAULT_SUBTITLE}</p>
+            <p className="mt-4 max-w-xl text-[0.95rem] leading-relaxed text-slate-200">
               AI is transforming how organizations operate. But with new tools, AI agents, and constant technology
               announcements, how do you separate real opportunity from hype?
             </p>
-            <p className="mt-4 max-w-3xl text-lg leading-relaxed text-slate-700">
+            <p className="mt-3 max-w-xl text-[0.95rem] leading-relaxed text-slate-200">
               Join Prof. Ekpe Okorafor for a practical, leadership-focused masterclass designed to help you understand
               the AI shift, recognize strategic opportunities, and identify your next step.
             </p>
 
-            <ul className="mt-8 flex flex-wrap gap-x-8 gap-y-3 text-base font-medium text-slate-800">
-              {[
-                [Check, 'Free admission'],
-                [Clock, '60 minutes'],
-                [MonitorPlay, 'Live online'],
-                [Users, 'No technical background required'],
-              ].map(([Icon, text]: any) => (
-                <li key={text} className="flex items-center gap-2.5">
-                  <Icon className="h-5 w-5 shrink-0 text-blue-900" aria-hidden="true" />
-                  {text}
+            <ul className="mt-6 flex max-w-xl flex-wrap gap-x-5 gap-y-4">
+              {(
+                [
+                  [Ticket, 'Free', 'admission'],
+                  [Clock, '60', 'minutes'],
+                  [Video, 'Live', 'online'],
+                  [Users, 'No technical', 'background required'],
+                ] as [LucideIcon, string, string][]
+              ).map(([Icon, line1, line2]) => (
+                <li key={line1} className="flex items-center gap-2.5">
+                  <Icon className="h-7 w-7 shrink-0 text-gold-400" aria-hidden="true" />
+                  <span className="text-[0.72rem] font-bold uppercase leading-tight tracking-wide text-white">
+                    {line1}
+                    <br />
+                    {line2}
+                  </span>
                 </li>
               ))}
             </ul>
 
             {/* Real date/time only when configured — never a fictitious one. */}
-            <div className="mt-8 w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-start gap-3">
-                <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-blue-900" aria-hidden="true" />
-                <div>
-                  {config?.startsAt ? (
-                    <>
-                      <p className="font-semibold text-slate-900">{formatEventWhen(config.startsAt, config.timezone)}</p>
-                      {visitorLocal && <p className="mt-1 text-sm text-slate-600">Your local time: {visitorLocal}</p>}
-                    </>
-                  ) : state.status === 'loading' ? (
-                    <p className="text-slate-600">Loading event details…</p>
-                  ) : (
-                    <>
-                      <p className="font-semibold text-slate-900">Date and time to be announced</p>
-                      <p className="mt-1 text-sm text-slate-600">
-                        {mode === 'interest'
-                          ? 'Join the waitlist and we will email you as soon as the date is confirmed.'
-                          : 'Check back soon for the schedule.'}
-                      </p>
-                    </>
-                  )}
-                </div>
+            <div className="mt-6 inline-flex max-w-xl items-start gap-3 rounded-2xl border border-gold-500/40 bg-white/5 px-5 py-3">
+              <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-gold-400" aria-hidden="true" />
+              <div>
+                {config?.startsAt ? (
+                  <>
+                    <p className="font-semibold text-white">{formatEventWhen(config.startsAt, config.timezone)}</p>
+                    {visitorLocal && <p className="mt-1 text-sm text-slate-300">Your local time: {visitorLocal}</p>}
+                  </>
+                ) : state.status === 'loading' ? (
+                  <p className="text-slate-300">Loading event details…</p>
+                ) : (
+                  <>
+                    <p className="font-semibold text-white">Date and time to be announced</p>
+                    <p className="mt-1 text-sm text-slate-300">
+                      {mode === 'interest'
+                        ? 'Join the waitlist and we will email you as soon as the date is confirmed.'
+                        : 'Check back soon for the schedule.'}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
 
-            <div className="mt-8 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-              {/* On large screens the sign-up card sits beside the copy, so this button is only for smaller screens. */}
+            <div className="mt-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
               <a
                 ref={heroCtaRef}
                 href="#register"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-blue-900 px-8 py-4 text-base font-bold text-white shadow-lg shadow-blue-900/20 transition-colors hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-900 lg:hidden"
+                className="inline-flex shrink-0 items-center justify-center gap-3 whitespace-nowrap rounded-full bg-gold-500 px-8 py-3.5 text-lg font-extrabold text-navy-950 shadow-lg shadow-black/30 transition-colors hover:bg-gold-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               >
                 {ctaLabel}
                 <ArrowRight className="h-5 w-5" aria-hidden="true" />
               </a>
               <Link
                 to="/#courses"
-                className="text-base font-semibold text-blue-900 underline underline-offset-4 hover:text-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-900"
+                className="whitespace-nowrap text-base font-semibold text-white underline decoration-gold-400 underline-offset-4 hover:text-gold-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               >
                 Explore the AI Leadership Academy
               </Link>
             </div>
           </div>
 
-          {/* Sign-up card: large screens only. Smaller screens use the button above and the form further down. */}
-          <div className="hidden lg:block">
-            {config && (mode === 'registration' || mode === 'interest') && (
-              <RegistrationForm config={config} mode={mode} variant="compact" idPrefix="signup" />
-            )}
-            {config && mode === 'closed' && (
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl" role="status">
-                <p className="text-lg font-bold text-slate-900">Registration for this session is closed.</p>
-                <p className="mt-2 text-sm text-slate-700">The free self-paced course is open any time. See the pathways below.</p>
-              </div>
-            )}
-            {(state.status === 'missing' || state.status === 'error') && (
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl" role="status">
-                <p className="text-lg font-bold text-slate-900">Registration isn't open yet.</p>
-                <p className="mt-2 text-sm text-slate-700">Please check back soon.</p>
-              </div>
-            )}
-            {state.status === 'loading' && <div aria-hidden="true" className="h-[26rem] animate-pulse rounded-3xl bg-slate-100 motion-reduce:animate-none" />}
-          </div>
-        </div>
-      </section>
-
-      {/* 2 — The leadership problem */}
-      <section aria-labelledby="problem-title" className="bg-white py-20 sm:py-24">
-        <div className="mx-auto max-w-5xl px-6">
-          <SectionHeading id="problem-title">AI Is Moving Fast. Leadership Clarity Matters More Than Ever.</SectionHeading>
-          <ul className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
-            {PROBLEMS.map((p) => (
-              <li key={p} className="flex items-start gap-3 border-b border-slate-200 pb-4 text-lg text-slate-800">
-                <span aria-hidden="true" className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-600" />
-                {p}
-              </li>
-            ))}
-          </ul>
-          <p className="mx-auto mt-12 max-w-3xl text-balance text-center text-2xl font-semibold leading-snug text-blue-900">
-            You don't need to master every AI tool. You need a framework for making better AI leadership decisions.
-          </p>
-        </div>
-      </section>
-
-      {/* 3 — Outcomes */}
-      <section aria-labelledby="learn-title" className="bg-slate-50 py-20 sm:py-24">
-        <div className="mx-auto max-w-6xl px-6">
-          <SectionHeading eyebrow="What participants will learn" id="learn-title">
-            What You'll Walk Away With
-          </SectionHeading>
-          <ol className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {OUTCOMES.map((o, i) => (
-              <li key={o.title} className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
-                <span aria-hidden="true" className="text-sm font-bold tracking-widest text-amber-800">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <h3 className="mt-3 text-xl font-bold text-slate-900">{o.title}</h3>
-                <p className="mt-2 leading-relaxed text-slate-700">{o.body}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* 4 — Who should attend */}
-      <section aria-labelledby="who-title" className="bg-white py-20 sm:py-24">
-        <div className="mx-auto max-w-6xl px-6">
-          <SectionHeading eyebrow="Who should attend" id="who-title">
-            Designed for Leaders Across Sectors
-          </SectionHeading>
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {AUDIENCES.map((a) => (
-              <li key={a} className="rounded-2xl border border-slate-200 bg-white p-5 text-base font-medium leading-snug text-slate-800">
-                {a}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-10 text-center text-xl font-semibold text-blue-900">No coding required. No AI expertise assumed.</p>
-        </div>
-      </section>
-
-      {/* 5 — Agenda */}
-      <section aria-labelledby="agenda-title" className="bg-slate-50 py-20 sm:py-24">
-        <div className="mx-auto max-w-3xl px-6">
-          <SectionHeading eyebrow="The 60-minute agenda" id="agenda-title">
-            A Focused Hour, Built Around You
-          </SectionHeading>
-          <ol className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
-            {(config?.agenda ?? DEFAULT_AGENDA).map((item) => (
-              <li key={item.time} className="flex flex-col gap-1 px-6 py-5 sm:flex-row sm:items-baseline sm:gap-6">
-                <span className="w-28 shrink-0 text-sm font-bold uppercase tracking-wide text-amber-800">{item.time}</span>
-                <span className="text-lg font-semibold text-slate-900">{item.title}</span>
-              </li>
-            ))}
-          </ol>
-          <p className="mt-4 text-center text-sm text-slate-600">Agenda may be adjusted to fit the questions in the room.</p>
-        </div>
-      </section>
-
-      {/* 6 — Instructor */}
-      <section aria-labelledby="instructor-title" className="bg-white py-20 sm:py-24">
-        <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 lg:grid-cols-12">
-          <div className="lg:col-span-4">
-            <div className="mx-auto aspect-[4/5] max-w-xs overflow-hidden rounded-3xl bg-slate-200 shadow-xl">
-              <img src={PHOTO} alt="Prof. Ekpe Okorafor" width={800} height={1000} loading="lazy" className="h-full w-full object-cover" />
+          {/* Portrait, instructor card and sector collage */}
+          <div className="pb-8 lg:relative lg:min-h-[34rem] lg:pb-0">
+            <div className="relative h-80 sm:h-[26rem] lg:absolute lg:inset-y-0 lg:left-0 lg:h-auto lg:w-[58%]" style={photoMask}>
+              <picture>
+                <source type="image/webp" srcSet={PHOTO_WEBP} />
+                <img
+                  src={PHOTO_JPG}
+                  alt="Prof. Ekpe Okorafor"
+                  width={1100}
+                  height={971}
+                  fetchPriority="high"
+                  className="h-full w-full object-cover object-[50%_22%]"
+                />
+              </picture>
+              <span aria-hidden="true" className="absolute inset-0 bg-navy-700/45 mix-blend-multiply" />
+              <span aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(ellipse_50%_56%_at_50%_46%,transparent_52%,rgba(5,15,38,0.94)_100%)]" />
+              <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-navy-950/55 via-transparent to-transparent" />
             </div>
-          </div>
-          <div className="lg:col-span-8">
-            <Eyebrow>Meet your instructor</Eyebrow>
-            <h2 id="instructor-title" className="text-balance text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-              Learn from Someone Who Works Across Academia, Research, and Industry
-            </h2>
-            <p className="mt-6 text-lg leading-relaxed text-slate-700">
-              <strong className="text-slate-900">Prof. Ekpe Okorafor</strong> is a professor, AI researcher, and
-              experienced industry AI strategy practitioner, and the founder and lead instructor of MyLearningLaunchpad.
-            </p>
-            <ul className="mt-6 space-y-3 text-lg text-slate-800">
-              {['Academia and executive education', 'AI research and innovation', 'Industry AI strategy and transformation'].map((t) => (
-                <li key={t} className="flex items-start gap-3">
-                  <Check className="mt-1 h-5 w-5 shrink-0 text-blue-900" aria-hidden="true" />
-                  {t}
-                </li>
+
+            <div className="relative z-20 -mt-6 rounded-2xl border border-white/10 bg-navy-950/85 p-5 shadow-2xl backdrop-blur lg:absolute lg:bottom-6 lg:left-[1%] lg:mt-0 lg:w-[56%]">
+              <p className="text-xs font-extrabold uppercase tracking-[0.2em] text-gold-400">With</p>
+              <p className="mt-1 text-2xl font-bold text-white">Prof. Ekpe Okorafor</p>
+              <p className="mt-2 text-sm text-slate-200">Professor · AI Researcher · Industry Practitioner</p>
+              <p className="text-sm text-slate-200">Founder &amp; Lead Instructor, MyLearningLaunchpad</p>
+            </div>
+
+            <ul
+              aria-label="Leaders this masterclass is for"
+              className="mt-6 grid grid-cols-2 gap-1 lg:absolute lg:inset-y-0 lg:right-0 lg:mt-0 lg:w-[46%] lg:grid-rows-4 lg:[clip-path:polygon(9%_0,100%_0,100%_100%,0_100%)]"
+            >
+              {SECTORS.map((s) => (
+                <SectorTile key={s.key} s={s} />
               ))}
             </ul>
-            <p className="mt-6 text-sm text-slate-600">
-              This webinar is an independent MyLearningLaunchpad AI Leadership Academy session.
-            </p>
           </div>
         </div>
       </section>
 
-      {/* 7 — Continue learning */}
-      <section aria-labelledby="journey-title" className="bg-slate-50 py-20 sm:py-24">
-        <div className="mx-auto max-w-6xl px-6">
-          <SectionHeading eyebrow="Continue your learning" id="journey-title">
-            Your AI Leadership Journey Doesn't End with the Webinar
-          </SectionHeading>
-
-          <div className="rounded-3xl border border-blue-900/15 bg-white p-8 shadow-sm sm:p-10">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-green-800">Free flagship course</p>
-            <h3 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">{flagship?.title ?? 'AI Strategy for Leaders'}</h3>
-            <p className="mt-1 text-lg font-medium text-blue-900">From Generative AI to the Agentic Enterprise</p>
-            <p className="mt-4 max-w-3xl text-lg leading-relaxed text-slate-700">
-              A self-paced foundational course helping leaders understand AI capabilities, evaluate opportunities, and lead
-              responsible adoption.
-            </p>
-            <Link
-              to={withAttribution(`/course/${FLAGSHIP_COURSE_ID}`, 'webinar_page_flagship')}
-              onClick={() => trackWebinar('free_course_click', { event_id: DEFAULT_EVENT_ID, course_id: FLAGSHIP_COURSE_ID, placement: 'journey' })}
-              className="mt-6 inline-flex items-center gap-2 rounded-full bg-blue-900 px-7 py-3.5 text-base font-bold text-white transition-colors hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-900"
-            >
-              Enroll in the Free Course
-              <ArrowRight className="h-5 w-5" aria-hidden="true" />
-            </Link>
+      {/* 2 — Outcomes strip */}
+      <section aria-labelledby="learn-title" className="bg-cream py-14 text-navy-950">
+        <div className="mx-auto grid max-w-[88rem] gap-10 px-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-start lg:px-8">
+          <div>
+            <h2 id="learn-title" className="text-3xl font-extrabold leading-tight tracking-tight">
+              What You'll Walk Away With
+            </h2>
+            <span aria-hidden="true" className="mt-4 block h-0.5 w-12 bg-gold-500" />
           </div>
-
-          {pathways.length > 0 && (
-            <div className="mt-10">
-              <h3 className="mb-4 text-sm font-bold uppercase tracking-[0.2em] text-slate-600">Go deeper, when you're ready</h3>
-              <ul className="grid gap-4 sm:grid-cols-2">
-                {pathways.map((c) => (
-                  <li key={c.id}>
-                    <Link
-                      to={withAttribution(`/course/${c.id}`, 'webinar_page_pathway')}
-                      onClick={() => trackWebinar('paid_course_click', { event_id: DEFAULT_EVENT_ID, course_id: c.id, placement: 'journey' })}
-                      className="group flex h-full items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-colors hover:border-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-900"
-                    >
-                      <span className="font-semibold leading-snug text-slate-900">{c.title}</span>
-                      <ArrowRight className="h-5 w-5 shrink-0 text-slate-500 transition-colors group-hover:text-blue-900" aria-hidden="true" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <ol className="grid gap-8 sm:grid-cols-2 lg:grid-cols-5 lg:gap-0">
+            {OUTCOMES.map((o) => (
+              <li key={o.title} className="lg:border-l lg:border-slate-300/80 lg:px-6 lg:first:border-l-0 lg:first:pl-0">
+                <o.Icon className="h-9 w-9 text-gold-600" aria-hidden="true" />
+                <h3 className="mt-3 text-lg font-bold leading-snug">{o.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-700">{o.body}</p>
+              </li>
+            ))}
+          </ol>
         </div>
       </section>
 
-      {/* 8 — Registration */}
+      {/* 3 — Journey strip */}
+      <section aria-labelledby="journey-title" className="bg-navy-900 py-14 text-white">
+        <div className="mx-auto grid max-w-[88rem] gap-10 px-6 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-center lg:px-8">
+          <div>
+            <h2 id="journey-title" className="text-balance text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl">
+              Your AI Leadership Journey Doesn't End with the Webinar
+            </h2>
+            <span aria-hidden="true" className="mt-4 block h-0.5 w-12 bg-gold-500" />
+            <p className="mt-4 text-sm leading-relaxed text-slate-200">
+              Continue building your capabilities with our practical courses designed for leaders.
+            </p>
+          </div>
+          <ul className="grid gap-x-4 gap-y-6 sm:grid-cols-2 lg:grid-cols-5">
+            {[flagship, ...pathways].filter(Boolean).map((c) => {
+              const isFree = c!.id === FLAGSHIP_COURSE_ID;
+              const [name, tagline] = splitTitle(c!.title);
+              const Icon = JOURNEY_ICONS[c!.id] ?? BookOpen;
+              return (
+                <li key={c!.id}>
+                  <Link
+                    to={withAttribution(`/course/${c!.id}`, 'webinar_page_journey')}
+                    onClick={() =>
+                      trackWebinar(isFree ? 'free_course_click' : 'paid_course_click', { event_id: DEFAULT_EVENT_ID, course_id: c!.id, placement: 'journey' })
+                    }
+                    className={`group relative flex h-full flex-col rounded-xl border p-4 transition-colors hover:border-gold-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${
+                      isFree ? 'border-gold-500/80 bg-navy-800' : 'border-white/15 bg-navy-800/50'
+                    }`}
+                  >
+                    {isFree && (
+                      <span className="absolute -top-2.5 left-3 rounded bg-gold-500 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-navy-950">
+                        Free course
+                      </span>
+                    )}
+                    <span className="flex items-start gap-3">
+                      <Icon className="h-8 w-8 shrink-0 text-gold-400" aria-hidden="true" />
+                      <span className="font-bold leading-snug text-white">{name}</span>
+                    </span>
+                    <span className="mt-2 text-xs leading-snug text-slate-300">
+                      {isFree ? 'From Generative AI to the Agentic Enterprise' : tagline}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </section>
+
+      {/* 4 — Instructor */}
+      <section aria-labelledby="instructor-title" className="bg-cream py-20 sm:py-24">
+        <div className="mx-auto max-w-3xl px-6 text-center">
+          <Eyebrow>Meet your instructor</Eyebrow>
+          <h2 id="instructor-title" className="text-balance text-3xl font-bold tracking-tight text-navy-950 sm:text-4xl">
+            Learn from Someone Who Works Across Academia, Research, and Industry
+          </h2>
+          <p className="mt-6 text-lg leading-relaxed text-slate-700">
+            <strong className="text-slate-900">Prof. Ekpe Okorafor</strong> is a professor, AI researcher, and experienced
+            industry AI strategy practitioner, and the founder and lead instructor of MyLearningLaunchpad.
+          </p>
+          <ul className="mx-auto mt-6 inline-block space-y-3 text-left text-lg text-slate-800">
+            {['Academia and executive education', 'AI research and innovation', 'Industry AI strategy and transformation'].map((t) => (
+              <li key={t} className="flex items-start gap-3">
+                <Check className="mt-1 h-5 w-5 shrink-0 text-gold-600" aria-hidden="true" />
+                {t}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-6 text-sm text-slate-600">This webinar is an independent MyLearningLaunchpad AI Leadership Academy session.</p>
+        </div>
+      </section>
+
+      {/* 5 — Registration */}
       <section id="register" aria-labelledby="register-title" className="bg-white py-20 sm:py-24">
         <div className="mx-auto max-w-2xl px-6">
           <div className="mb-10 text-center">
-            <h2 id="register-title" className="text-balance text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+            <h2 id="register-title" className="text-balance text-3xl font-bold tracking-tight text-navy-950 sm:text-4xl">
               {mode === 'registration'
                 ? 'Reserve Your Free Seat'
                 : mode === 'interest'
@@ -477,7 +517,7 @@ export const WebinarPage = () => {
                 <Link
                   to={withAttribution(`/course/${FLAGSHIP_COURSE_ID}`, 'webinar_page_closed')}
                   onClick={() => trackWebinar('free_course_click', { event_id: DEFAULT_EVENT_ID, course_id: FLAGSHIP_COURSE_ID, placement: 'closed' })}
-                  className="font-semibold text-blue-900 underline underline-offset-2"
+                  className="font-semibold text-navy-900 underline underline-offset-2"
                 >
                   Explore AI Strategy for Leaders
                 </Link>
@@ -491,7 +531,7 @@ export const WebinarPage = () => {
               <p className="text-lg font-semibold text-slate-900">Registration isn't open yet.</p>
               <p className="mt-2 text-slate-700">
                 Please check back soon, or write to{' '}
-                <a href={`mailto:${SITE_CONTACT_EMAIL}`} className="font-semibold text-blue-900 underline underline-offset-2">
+                <a href={`mailto:${SITE_CONTACT_EMAIL}`} className="font-semibold text-navy-900 underline underline-offset-2">
                   {SITE_CONTACT_EMAIL}
                 </a>
                 .
@@ -501,8 +541,8 @@ export const WebinarPage = () => {
         </div>
       </section>
 
-      {/* 9 — FAQ */}
-      <section aria-labelledby="faq-title" className="bg-slate-50 py-20 sm:py-24">
+      {/* 6 — FAQ */}
+      <section aria-labelledby="faq-title" className="bg-cream py-20 sm:py-24">
         <div className="mx-auto max-w-3xl px-6">
           <SectionHeading eyebrow="Questions" id="faq-title">
             Frequently Asked Questions
@@ -510,7 +550,7 @@ export const WebinarPage = () => {
           <div className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
             {faqs.map((f) => (
               <details key={f.q} className="group px-6 py-1">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-lg py-4 text-left text-lg font-semibold text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-900 [&::-webkit-details-marker]:hidden">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-lg py-4 text-left text-lg font-semibold text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy-900 [&::-webkit-details-marker]:hidden">
                   {f.q}
                   <ChevronDown className="h-5 w-5 shrink-0 text-slate-500 transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
                 </summary>
@@ -521,18 +561,18 @@ export const WebinarPage = () => {
         </div>
       </section>
 
-      {/* 10 — Final CTA */}
-      <section id="final-cta" aria-labelledby="final-title" className="bg-blue-950 py-20 text-white sm:py-24">
+      {/* 7 — Final CTA */}
+      <section id="final-cta" aria-labelledby="final-title" className="bg-navy-950 py-20 text-white sm:py-24">
         <div className="mx-auto max-w-3xl px-6 text-center">
           <h2 id="final-title" className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">
-            The Future of AI Leadership Starts with Clarity.
+            The Future of AI Leadership Starts with <span className="text-gold-400">Clarity.</span>
           </h2>
-          <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-blue-100">
+          <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-slate-200">
             Join the free masterclass and discover a practical path from AI curiosity to confident leadership.
           </p>
           <a
             href="#register"
-            className="mt-8 inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-4 text-base font-bold text-blue-950 transition-colors hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="mt-8 inline-flex items-center justify-center gap-3 rounded-full bg-gold-500 px-9 py-4 text-lg font-extrabold text-navy-950 transition-colors hover:bg-gold-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             {ctaLabel}
             <ArrowRight className="h-5 w-5" aria-hidden="true" />
@@ -542,10 +582,10 @@ export const WebinarPage = () => {
 
       {/* Sticky mobile CTA */}
       {showSticky && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 p-3 backdrop-blur sm:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-navy-950/95 p-3 backdrop-blur sm:hidden">
           <a
             href="#register"
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-blue-900 px-6 py-3.5 text-base font-bold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-900"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-gold-500 px-6 py-3.5 text-base font-extrabold text-navy-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             {ctaLabel}
           </a>

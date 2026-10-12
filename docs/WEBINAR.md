@@ -14,7 +14,7 @@ MyLearningLaunchpad owns registration. Visitors never register on Google Meet.
 | Area | Where |
 |---|---|
 | Landing page (10 sections, sticky mobile CTA, FAQ, JSON-LD) | `src/components/webinar/WebinarPage.tsx` |
-| Registration form (full version near the bottom, compact **sign-up card** beside the hero on screens ≥1024px) | `src/components/webinar/RegistrationForm.tsx` |
+| Registration form (near the bottom; the hero button scrolls to it) | `src/components/webinar/RegistrationForm.tsx` |
 | Thank-you page (`noindex`) | `src/components/webinar/WebinarThankYou.tsx` |
 | Privacy & cookie policy (**draft**, see blockers) | `src/components/PrivacyPolicy.tsx` |
 | Consent banner + gate for Google Analytics | `src/components/ConsentBanner.tsx`, `src/services/consent.ts`, `src/services/analyticsService.ts` |
@@ -29,6 +29,21 @@ MyLearningLaunchpad owns registration. Visitors never register on Google Meet.
 | Email copy review | `docs/webinar-email-samples/*.html` (`npx tsx scripts/render-webinar-emails.ts`) |
 
 The function count stays within the Vercel Hobby limit: one new function (`api/webinar.ts`), 10 of 12 total.
+
+## Design (matches the approved mockup)
+
+Navy + gold + warm off-white (tokens `navy-*`, `gold-*`, `cream` in `src/index.css`): dark hero with the portrait, an instructor card and a
+six-sector collage; a cream "What You'll Walk Away With" strip; a navy course-journey strip (free flagship highlighted, four paid programs, titles
+taken from the live catalog); then instructor, registration, FAQ and final-CTA sections. (The "AI is moving fast" problem section, the "Designed for Leaders
+Across Sectors" audience section and the 60-minute agenda were removed at the owner's request; the agenda field in Admin → Webinars is therefore no longer shown on the page.)
+
+- **Sector collage photos:** the six tiles (Academia, Government, SMEs & Startups, Nonprofits, Research, Education & Professionals) ship as gradient + icon tiles.
+  To use real photos, add files to `public/images/webinar/` named `academia.jpg`, `government.jpg`, `smes-startups.jpg`, `nonprofits.jpg`,
+  `research.jpg`, `education-professionals.jpg` (landscape, ~1200px wide, under 300 KB each). They layer over the gradients automatically; no code change.
+  Use photos you have the rights to.
+- **Portrait:** the hero uses web-sized copies (`prof_ekpe_okorafor-1100.webp/.jpg`, 41/78 KB). The 6 MB original is untouched. For the closest match to the mockup, supply a
+  background-removed (transparent PNG/WebP) cut-out and swap it in `PHOTO_WEBP`/`PHOTO_JPG` in `WebinarPage.tsx`; the current version blends the studio backdrop into the navy with CSS.
+- The social-share image now defaults to the 78 KB JPEG (LinkedIn can reject images over ~5 MB).
 
 ## Data model (Firestore)
 

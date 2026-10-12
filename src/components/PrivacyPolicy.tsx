@@ -42,7 +42,7 @@ export const PrivacyPolicy = () => {
           This policy explains what personal information MyLearningLaunchpad (“we”, “us”) collects through
           mylearninglaunchpad.com, why we collect it, and the choices you have. We are operated by [legal entity name and
           registered address]. You can reach us at{' '}
-          <a href="mailto:info@mylearninglaunchpad.com" className="font-semibold text-blue-900 underline">info@mylearninglaunchpad.com</a>.
+          <a href="mailto:info@mylearninglaunchpad.com" className="font-semibold text-navy-900 underline">info@mylearninglaunchpad.com</a>.
         </P>
 
         <H2>What we collect</H2>
@@ -121,7 +121,7 @@ export const PrivacyPolicy = () => {
         <button
           type="button"
           onClick={requestConsentReopen}
-          className="rounded-full border border-blue-900 px-5 py-2.5 text-sm font-semibold text-blue-900 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-900"
+          className="rounded-full border border-navy-900 px-5 py-2.5 text-sm font-semibold text-navy-900 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-900"
         >
           Change my cookie choice
         </button>
@@ -130,7 +130,7 @@ export const PrivacyPolicy = () => {
         <P>We will update this page when our practices change and revise the date above.</P>
 
         <p className="mt-12">
-          <Link to="/" className="font-semibold text-blue-900 underline">Back to home</Link>
+          <Link to="/" className="font-semibold text-navy-900 underline">Back to home</Link>
         </p>
       </article>
     </main>

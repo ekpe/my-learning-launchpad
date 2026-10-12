@@ -68,7 +68,7 @@ export const WebinarThankYou = () => {
           </p>
           <Link
             to="/webinar#register"
-            className="mt-8 inline-flex items-center gap-2 rounded-full bg-blue-900 px-7 py-3.5 font-bold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-900"
+            className="mt-8 inline-flex items-center gap-2 rounded-full bg-navy-900 px-7 py-3.5 font-bold text-white hover:bg-navy-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-900"
           >
             Go to registration <ArrowRight className="h-5 w-5" aria-hidden="true" />
           </Link>
@@ -146,14 +146,14 @@ export const WebinarThankYou = () => {
                 })}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-blue-900 px-6 py-3 font-semibold text-blue-900 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-900"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-navy-900 px-6 py-3 font-semibold text-navy-900 hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-900"
               >
                 <CalendarPlus className="h-5 w-5" aria-hidden="true" /> Add to Google Calendar
               </a>
               <button
                 type="button"
                 onClick={downloadIcs}
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-6 py-3 font-semibold text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-900"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-6 py-3 font-semibold text-slate-800 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-900"
               >
                 <Download className="h-5 w-5" aria-hidden="true" /> Download .ics file
               </button>
@@ -162,7 +162,7 @@ export const WebinarThankYou = () => {
         </div>
 
         {/* Soft next step — never required for the webinar. */}
-        <div className="mt-8 rounded-3xl border border-blue-900/15 bg-white p-8 sm:p-10">
+        <div className="mt-8 rounded-3xl border border-navy-900/15 bg-white p-8 sm:p-10">
           <h2 className="text-2xl font-bold text-slate-900">While You Wait, Explore Our Free AI Strategy for Leaders Course</h2>
           <p className="mt-3 text-lg leading-relaxed text-slate-700">
             A self-paced foundation in AI leadership, free to start whenever you like. It's optional, and you don't need it
@@ -171,7 +171,7 @@ export const WebinarThankYou = () => {
           <Link
             to={withAttribution(`/course/${FLAGSHIP_COURSE_ID}`, 'webinar_thank_you')}
             onClick={() => trackWebinar('free_course_click', { event_id: nav?.eventId, course_id: FLAGSHIP_COURSE_ID, placement: 'thank_you' })}
-            className="mt-6 inline-flex items-center gap-2 rounded-full bg-blue-900 px-7 py-3.5 font-bold text-white hover:bg-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-900"
+            className="mt-6 inline-flex items-center gap-2 rounded-full bg-navy-900 px-7 py-3.5 font-bold text-white hover:bg-navy-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-900"
           >
             Explore the free course <ArrowRight className="h-5 w-5" aria-hidden="true" />
           </Link>

@@ -2,6 +2,17 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Webinar / Academy palette */
+  --color-navy-950: #050f26;
+  --color-navy-900: #0a1b3d;
+  --color-navy-800: #112a57;
+  --color-navy-700: #183a73;
+  --color-gold-300: #f7d58a;
+  --color-gold-400: #f4b942;
+  --color-gold-500: #e9a42d;
+  --color-gold-600: #c98714;
+  --color-cream: #f7f5ef;
   
   @keyframes bounce-subtle {
     0%, 100% { transform: translateY(0); }

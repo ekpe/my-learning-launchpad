@@ -22,7 +22,7 @@ const TITLE = 'Leading in the Age of AI: From Hype to Strategy | MyLearningLaunc
 const OG_TITLE = 'Leading in the Age of AI: From Hype to Strategy — Free Live Masterclass';
 const DESCRIPTION =
   'A free 60-minute live masterclass with Prof. Ekpe Okorafor: what leaders need to know about generative AI, AI agents and the future of work. No technical background required.';
-const imageSetting = process.env.WEBINAR_OG_IMAGE || '/images/prof_ekpe_okorafor.jpg';
+const imageSetting = process.env.WEBINAR_OG_IMAGE || '/images/prof_ekpe_okorafor-1100.jpg';
 const IMAGE = /^https?:\/\//.test(imageSetting) ? imageSetting : `${SITE}${imageSetting}`;
 const URL_ = `${SITE}/webinar`;
 
