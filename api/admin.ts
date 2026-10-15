@@ -9,6 +9,11 @@
  *   DELETE /api/admin?resource=delete-user&uid=:uid
  *   POST   /api/admin?resource=upload
  *   POST   /api/admin?resource=sync-users
+ *   POST   /api/admin?resource=sync-courses          (archives replaced curriculum; guards media URLs;
+ *                                                      launch-gated courses go to a draft, never live)
+ *   GET    /api/admin?resource=course-draft-get&courseId=:id
+ *   POST   /api/admin?resource=course-draft-save | course-publish | course-migrate-progress
+ *   GET    /api/admin?resource=course-readiness&courseId=:id[&verify=1]
  *   GET    /api/admin?resource=webinar-get&eventId=:id
  *   POST   /api/admin?resource=webinar-save | webinar-reschedule | webinar-broadcast |
  *                              webinar-refresh-delivery | webinar-mark-attended
@@ -19,6 +24,7 @@ import { withAdmin } from "./_lib/with-admin.js";
 import { handleOptions } from "./_lib/cors.js";
 import { getStorage } from "firebase-admin/storage";
 import { v4 as uuidv4 } from "uuid";
+import { handleCourseAdminOp, syncCourseList } from "./_lib/course-admin.js";
 import { broadcast, getWebinar, markAttended, refreshDelivery, rescheduleReminders, saveWebinar } from "./_lib/webinar-admin.js";
 
 export const config = { api: { bodyParser: false } };
@@ -130,25 +136,21 @@ async function uploadFile(req: VercelRequest, res: VercelResponse) {
 }
 
 async function syncCourses(req: VercelRequest, res: VercelResponse) {
-  const { courses } = await parseJsonBody(req);
+  const { courses, confirmMediaReplacement } = await parseJsonBody(req);
   if (!Array.isArray(courses) || courses.length === 0)
     return res.status(400).json({ error: "courses array is required" });
 
-  let synced = 0;
-  const errors: string[] = [];
-  for (const course of courses) {
-    if (!course.id) { errors.push(`Course missing id: ${course.title}`); continue; }
-    try {
-      await db.collection("courses").doc(course.id).set(
-        { ...course, updatedAt: FieldValue.serverTimestamp() },
-        { merge: true }
-      );
-      synced++;
-    } catch (e: any) {
-      errors.push(`${course.id}: ${e.message}`);
-    }
-  }
-  res.json({ success: true, synced, errors: errors.length > 0 ? errors : undefined });
+  const r = await syncCourseList(db, courses, () => FieldValue.serverTimestamp(), {
+    confirmMediaReplacement: Array.isArray(confirmMediaReplacement) ? confirmMediaReplacement : [],
+  });
+  res.json({
+    success: r.blocked.length === 0 && r.errors.length === 0,
+    synced: r.synced,
+    archived: r.archived.length ? r.archived : undefined,
+    drafted: r.drafted.length ? r.drafted : undefined,
+    blocked: r.blocked.length ? r.blocked : undefined,
+    errors: r.errors.length ? r.errors : undefined,
+  });
 }
 
 async function syncUsers(req: VercelRequest, res: VercelResponse) {
@@ -221,6 +223,11 @@ export default withAdmin(async (req: VercelRequest, res: VercelResponse) => {
       "webinar-refresh-delivery": refreshDelivery,
       "webinar-mark-attended": markAttended,
     };
+    if (typeof resource === "string" && resource.startsWith("course-")) {
+      const body = req.method === "POST" ? await parseJsonBody(req) : undefined;
+      const out = await handleCourseAdminOp(db, { method: req.method ?? "GET", resource, query: req.query, body }, () => FieldValue.serverTimestamp());
+      if (out) return res.status(out.status).json(out.body);
+    }
     if (req.method === "POST" && webinarOps[resource]) {
       const out = await webinarOps[resource](await parseJsonBody(req));
       return res.status(out.status).json(out.body);

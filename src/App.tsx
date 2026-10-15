@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { nextRequiredKey, resolveTrack } from './lib/courseProgress';
+import { resolveCourse, useLiveCourseMap } from './hooks/useLiveCourses';
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Link } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
@@ -72,6 +74,8 @@ const StudentDashboard = () => {
   const { user, profile } = useAuth();
   const [enrollments, setEnrollments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // Learners see the live (published) course record, not the source-controlled draft.
+  const { liveById, ready: coursesReady } = useLiveCourseMap();
 
   useEffect(() => {
     if (!user) return;
@@ -92,7 +96,7 @@ const StudentDashboard = () => {
     return () => unsubscribe();
   }, [user]);
 
-  if (loading) {
+  if (loading || !coursesReady) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-12 h-12 animate-spin text-blue-900" />
@@ -101,22 +105,32 @@ const StudentDashboard = () => {
   }
 
   const enrolledCourses = enrollments.map(enrol => {
-    const course = courses.find(c => c.id === enrol.courseId);
-    return { ...course, enrollment: enrol };
+    const course = resolveCourse(enrol.courseId, liveById.get(enrol.courseId));
+    if (!course) return { enrollment: enrol } as any;
+    const track = resolveTrack(course, enrol);
+    // Enrolled on an older curriculum and not on the new one yet: show their ORIGINAL result untouched.
+    const legacyOnly = track.source === 'none' && track.isLegacyEnrollment;
+    const originalDone = track.legacy?.status === 'COMPLETED';
+    const view = {
+      track,
+      legacyOnly,
+      statusLabel: legacyOnly ? (originalDone ? 'COMPLETED · ORIGINAL VERSION' : 'UPDATED COURSE') : track.status === 'NOT_STARTED' ? 'ENROLLED' : track.status,
+      progress: legacyOnly ? (track.legacy?.progress ?? 0) : track.source === 'v2Progress' ? (enrol.v2Progress?.progress ?? 0) : (enrol.progress || 0),
+      showCertificate: enrol.status === 'COMPLETED' && (track.source === 'primary' || originalDone),
+    };
+    return { ...course, enrollment: enrol, view };
   }).filter(c => c.id);
 
   const getResumeLink = (course: any) => {
     if (!course.curriculum) return `/course/${course.id}`;
     
-    const completed = course.enrollment.completedLessons || [];
-    
-    for (let m = 0; m < course.curriculum.length; m++) {
-      for (let l = 0; l < course.curriculum[m].topics.length; l++) {
-        const id = `${m}_${l}`;
-        if (!completed.includes(id)) {
-          return `/course/${course.id}/lesson/${m}/${l}`;
-        }
-      }
+    // Progress for the curriculum as it is now (never an older version's positional ids)
+    const completed = course.view?.track.completedLessons ?? course.enrollment.completedLessons ?? [];
+
+    const next = nextRequiredKey(course, completed);
+    if (next) {
+      const [m, l] = next.split('_');
+      return `/course/${course.id}/lesson/${m}/${l}`;
     }
     return `/course/${course.id}/lesson/0/0`;
   };
@@ -157,7 +171,7 @@ const StudentDashboard = () => {
                   <PlayCircle className="w-12 h-12 text-white" />
                 </div>
                 <div className="absolute top-4 right-4 px-3 py-1 bg-white/90 backdrop-blur-sm rounded-full text-[10px] font-bold uppercase tracking-wider text-blue-900">
-                  {course.enrollment.status.replace('_', ' ')}
+                  {(course.view?.statusLabel ?? course.enrollment.status).replace('_', ' ')}
                 </div>
               </div>
               <div className="p-6 flex-1 flex flex-col">
@@ -177,21 +191,23 @@ const StudentDashboard = () => {
                 <div className="mt-auto pt-6">
                   <div className="flex justify-between text-xs font-bold text-slate-500 mb-2">
                     <span>Progress</span>
-                    <span>{course.enrollment.progress || 0}%</span>
+                    <span>{course.view?.progress ?? (course.enrollment.progress || 0)}%</span>
                   </div>
                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-6">
                     <div 
                       className="h-full bg-blue-900 rounded-full transition-all duration-500" 
-                      style={{ width: `${course.enrollment.progress || 0}%` }}
+                      style={{ width: `${course.view?.progress ?? (course.enrollment.progress || 0)}%` }}
                     />
                   </div>
                   <div className="flex flex-col gap-3">
                     <Link to={getResumeLink(course)}>
                       <Button className="w-full rounded-xl font-bold py-5">
-                        {course.enrollment.progress > 0 ? 'Resume Learning' : 'Start Learning'}
+                        {course.view?.legacyOnly
+                          ? (course.view.track.legacy?.status === 'COMPLETED' ? 'Take the new 90-minute course' : 'Start the new version')
+                          : (course.view?.progress ?? course.enrollment.progress) > 0 ? 'Resume Learning' : 'Start Learning'}
                       </Button>
                     </Link>
-                    {course.enrollment.status === 'COMPLETED' && (
+                    {(course.view ? course.view.showCertificate : course.enrollment.status === 'COMPLETED') && (
                       <Link to={`/certificate/CERT_${user.uid}_${course.id}`}>
                         <Button variant="outline" className="w-full rounded-xl font-bold py-5 border-amber-200 text-amber-700 hover:bg-amber-50">
                           <Trophy className="w-4 h-4 mr-2" />

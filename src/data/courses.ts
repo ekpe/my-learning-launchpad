@@ -4,242 +4,135 @@ export const courses: Course[] = [
   {
     id: "ai-strategy-leaders",
     title: "AI Strategy for Leaders",
-    description: "From Generative AI to the Agentic Enterprise — a practical foundation for AI leadership. Learn where AI creates value, how to redesign work for humans and AI together, how to govern autonomy responsibly, and how to move from experimentation to execution.",
-    duration: "Approximately 5 hours (Self-paced)",
-    format: "Self-paced online short course",
-    audience: "Executives, business leaders, managers, consultants, technology leaders, transformation professionals, entrepreneurs, and aspiring AI leaders",
+    subtitle: "From Generative AI to the Agentic Enterprise",
+    description: "A practical 90-minute introduction to AI leadership. Understand the AI shift, identify valuable opportunities, lead responsible adoption, and build your first 90-day AI action plan.",
+    cardDescription: "A practical 90-minute introduction to AI leadership. Understand the AI shift, discover where AI creates value, learn how to lead responsible adoption, and build your first 90-day AI action plan.",
+    duration: "90 minutes total",
+    format: "Self-paced · 6 focused modules",
+    audience: "Leaders, managers, entrepreneurs, educators, public-sector professionals, and aspiring AI leaders.",
     image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=800",
     isFree: true,
     order: 1,
-    fullDescription: "AI leadership is no longer primarily about understanding what artificial intelligence can do. It is about deciding where AI should create value, which workflows should be redesigned, what decisions can be delegated, where humans must remain accountable, how AI should be governed, and how organizations move from experimentation to execution. This course provides leaders with a practical foundation for answering those questions. Rather than teaching a particular AI product, it develops the strategic frameworks required to lead organizations through the transition from generative AI toward increasingly agentic, AI-native ways of working. The competitive advantage from AI will not come simply from having access to better models — it will come from redesigning work, decisions, and organizations around what humans and intelligent systems can accomplish together. Every learner receives the AI Strategy for Leaders Toolkit — ten practical frameworks including the AI Capability Ladder, the Autonomy Spectrum, the AI Opportunity Matrix, and the Human + AI Workflow Canvas — plus a MyLearningLaunchpad Certificate of Completion.",
+    trackLabel: "AI Leadership Foundations",
+    // Structure version 2 = the 90-minute redesign. Version 1 (7 modules, ~5 hours) is archived in docs/archive.
+    curriculumVersion: 2,
+    // Changes reach learners only via draft -> readiness check -> explicit publish (see api/_lib/course-publication.ts)
+    launchGate: true,
+    // Durations are design targets until the final recordings and activities are validated.
+    durationStatus: "planned",
+    fullDescription: "Artificial intelligence is changing how organizations work, make decisions, and create value. But effective AI leadership requires more than familiarity with the latest tools.\n\nIn this free, 90-minute self-paced course, Professor Ekpe Okorafor introduces six essential leadership decisions for navigating the transition from generative AI to increasingly agentic systems.\n\nYou'll learn what AI can do, where it can create meaningful value, how to redesign work around humans and AI, what responsible oversight requires, and how to turn an opportunity into a practical 90-day action plan.\n\nThrough six focused modules and one cumulative learning activity, you'll apply the concepts to a real workflow or challenge relevant to your organization.\n\nNo coding or prior AI expertise is required.",
     learningObjectives: [
-      "Explain the evolution from traditional AI through generative AI to agentic AI",
-      "Distinguish AI assistants, copilots, agents, agentic workflows, and multi-agent systems",
-      "Explain AI opportunities and limitations in business language, not just technical language",
-      "Identify high-value AI opportunities within business processes and workflows",
-      "Evaluate AI initiatives using business value, feasibility, risk, and strategic importance",
-      "Determine appropriate roles for humans and AI within redesigned workflows",
-      "Understand how increasing AI autonomy requires increasing governance",
-      "Recognize the organizational, workforce, data, technology, and governance capabilities enterprise AI requires",
-      "Avoid the common mistakes that trap AI initiatives in endless experimentation",
-      "Develop a practical 90-Day AI Leadership Action Plan for your organization, team, or role"
+      "Explain the shift from traditional and generative AI toward agentic AI.",
+      "Distinguish AI capability from reliability and delegated authority.",
+      "Identify a practical AI opportunity within an organization.",
+      "Decide which activities should be performed by humans and AI.",
+      "Recognize essential governance, oversight, and accountability requirements.",
+      "Outline a practical 90-day AI leadership action plan."
+    ],
+    outcomes: [
+      "Explain the shift from traditional and generative AI toward agentic AI.",
+      "Distinguish AI capability from reliability and delegated authority.",
+      "Identify a practical AI opportunity within an organization.",
+      "Decide which activities should be performed by humans and AI.",
+      "Recognize essential governance, oversight, and accountability requirements.",
+      "Outline a practical 90-day AI leadership action plan."
+    ],
+    benefits: [
+      "Six focused modules",
+      "90 minutes total",
+      "Self-paced learning",
+      "Practical leadership frameworks",
+      "One cumulative AI Leadership Action Card",
+      "No technical background required"
+    ],
+    nextStepCourseIds: ["ai-strategy-intensive", "ai-strategy-certification", "enterprise-ai-implementation", "leading-agentic-ai"],
+    // Deeper material from the original course. Listed so it is not lost, but NOT published or linked until
+    // an actual asset exists (available: true AND a url). None are available yet.
+    optionalResources: [
+      { title: "AI Leadership Self-Assessment", available: false },
+      { title: "Extended AI Capability Ladder examples", available: false },
+      { title: "Copilots, Assistants, Agents and Multi-Agent Systems", available: false },
+      { title: "AI Opportunity Matrix™ (detailed)", available: false },
+      { title: "Human + AI Workflow Canvas™", available: false },
+      { title: "AI Governance Checklist", available: false },
+      { title: "Enterprise AI Readiness Assessment", available: false },
+      { title: "Comprehensive 90-Day AI Leadership Action Plan", available: false }
     ],
     curriculum: [
       {
-        module: "Module 1: The AI Shift — From Automation to Intelligence",
+        module: "The AI Shift: From Automation to Intelligence",
+        phase: "Understand",
         topics: [
-          {
-            title: "Lesson 1.1 — Why This AI Moment Is Different",
-            description: "AI didn't begin with ChatGPT. This lesson traces the shift from traditional AI and predictive systems to generative, multimodal, reasoning-capable foundation models — and why declining barriers to adoption mean AI is becoming a general-purpose capability across knowledge work.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 1.2 — The AI Capability Ladder™",
-            description: "Introduces MyLearningLaunchpad's signature framework — Predict → Generate → Assist → Act → Collaborate → Orchestrate — showing how the leadership challenge shifts from technology adoption to delegation, governance, and organizational design as AI climbs the ladder.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 1.3 — What AI Can—and Cannot—Do",
-            description: "A clear-eyed look at AI's real strengths (pattern recognition, generation, synthesis, reasoning, tool use) and real limits (hallucination, reliability, context, judgment, accountability) — the foundation for sound strategic decisions.",
-            videoUrl: ""
-          },
-          {
-            title: "Module 1 Activity — AI Leadership Self-Assessment",
-            description: "Score yourself and your organization across AI understanding, adoption, sponsorship, data readiness, workforce readiness, governance, workflow redesign, and measurement. This baseline carries through the rest of the course.",
-            videoUrl: ""
-          }
+          { id: "m1-l1", title: "Lesson 1.1 — Why This AI Moment Is Different", kind: "lesson", plannedMinutes: 4, description: "Introduces the shift from traditional predictive AI to generative and increasingly agentic systems, and why that shift matters for leadership decisions rather than technical history.", videoUrl: "" },
+          { id: "m1-l2", title: "Lesson 1.2 — The AI Capability Ladder™", kind: "lesson", plannedMinutes: 4, description: "Predict → Generate → Assist → Act → Collaborate → Orchestrate. As capability rises, the questions leaders must ask change. Technical capability is never automatic permission to act.", videoUrl: "" },
+          { id: "m1-l3", title: "Lesson 1.3 — What AI Can—and Cannot—Do", kind: "lesson", plannedMinutes: 4, description: "Separates Capability → Reliability → Authority, and explains why human judgment and accountability remain important.", videoUrl: "" },
+          { id: "m1-a", title: "Activity — My AI Leadership Starting Point", kind: "activity", plannedMinutes: 3, description: "Choose one real workflow or challenge in your organization and identify one AI capability that could help.", output: "Action Card Output 1: My chosen workflow and the AI capability that could improve it." }
         ]
       },
       {
-        module: "Module 2: From Generative AI to Agentic AI",
+        module: "From Generative AI to Agentic AI",
+        phase: "Anticipate",
         topics: [
-          {
-            title: "Lesson 2.1 — Generative AI vs. Agentic AI",
-            description: "Generative AI runs Prompt → Generate → Respond. Agentic AI runs Goal → Plan → Act → Observe → Evaluate → Adapt. This lesson unpacks the goals, planning, tools, memory, and autonomy that separate the two — and why the difference matters for leaders.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 2.2 — Copilots, Assistants and Agents",
-            description: "A practical taxonomy — Assistant, Copilot, Agent, Agentic Workflow, Multi-Agent System — built around one leadership question: what authority are we actually giving the system?",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 2.3 — The Autonomy Spectrum",
-            description: "Introduces the AI Autonomy Spectrum™ — from Human Does to AI Acts Autonomously — and the core principle that autonomy should be earned, not assumed, through evidence of reliability, controls, and trust.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 2.4 — The Emerging Agentic Enterprise",
-            description: "Explores how agentic systems could reshape customer service, finance, HR, IT, software development, supply chains, sales, and more — and why agentic AI shouldn't just be layered onto inefficient processes.",
-            videoUrl: ""
-          },
-          {
-            title: "Module 2 Activity — The Delegation Exercise",
-            description: "Choose one recurring workflow and decide what should remain human, what AI could assist with, what AI could execute, and what should never be delegated without approval.",
-            videoUrl: ""
-          }
+          { id: "m2-l1", title: "Lesson 2.1 — From Generative AI to Agentic AI", kind: "lesson", plannedMinutes: 4, description: "Generative AI produces something. Agentic AI pursues something. One accessible organizational example shows the difference.", videoUrl: "" },
+          { id: "m2-l2", title: "Lesson 2.2 — The AI Autonomy Spectrum™", kind: "lesson", plannedMinutes: 5, description: "Human Does → AI Assists → AI Recommends → AI Acts with Approval → AI Acts with Oversight → AI Acts Autonomously. The spectrum is not a maturity model: the right position depends on the task, its reliability, the consequence of error and the controls available. Appropriate autonomy, not maximum autonomy, is the goal.", videoUrl: "" },
+          { id: "m2-l3", title: "Lesson 2.3 — Oversight, Command and Accountability", kind: "lesson", plannedMinutes: 3, description: "The practical difference between human-in-the-loop, human-on-the-loop and human-in-command, and why operational autonomy does not remove human accountability.", videoUrl: "" },
+          { id: "m2-a", title: "Activity — My Delegation Decision", kind: "activity", plannedMinutes: 3, description: "For your workflow, identify its current autonomy position, an appropriate target position, and one reason not to delegate further.", output: "Action Card Output 2: My appropriate AI autonomy decision." }
         ]
       },
       {
-        module: "Module 3: Finding the Value — Where Should We Apply AI?",
+        module: "Finding the Value: Where Should We Apply AI?",
+        phase: "Identify",
         topics: [
-          {
-            title: "Lesson 3.1 — Stop Starting With the Technology",
-            description: "Reframes the wrong question ('Where can we use AI?') into the right one: where is valuable work constrained by time, cost, complexity, information, or human capacity? Start with business problems, not AI capabilities.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 3.2 — The AI Value Map™",
-            description: "Four value domains — Productivity, Experience, Growth, and Transformation — give leaders a shared language for mapping where AI opportunities actually create value.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 3.3 — Think Workflow, Not Use Case",
-            description: "Moves from isolated tasks ('summarize documents') to full workflow redesign, teaching leaders to identify triggers, inputs, decisions, actions, systems, bottlenecks, and exceptions across a process.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 3.4 — Prioritizing AI Opportunities",
-            description: "Introduces the AI Opportunity Matrix™ — scoring potential initiatives on business value, feasibility, risk, and strategic fit — to move beyond random experimentation toward systematic prioritization.",
-            videoUrl: ""
-          },
-          {
-            title: "Module 3 Activity — Find Your Top Three AI Opportunities",
-            description: "Identify 5–10 opportunities, score them with the AI Opportunity Matrix, and select one priority workflow — this becomes the subject of your capstone.",
-            videoUrl: ""
-          }
+          { id: "m3-l1", title: "Lesson 3.1 — Start with the Problem, Not the Technology", kind: "lesson", plannedMinutes: 4, description: "Valuable AI opportunities begin with organizational needs, bottlenecks and desired outcomes, not with a tool.", videoUrl: "" },
+          { id: "m3-l2", title: "Lesson 3.2 — The AI Value Map™", kind: "lesson", plannedMinutes: 4, description: "Productivity → Experience → Growth → Transformation, illustrated with an accessible cross-sector example.", videoUrl: "" },
+          { id: "m3-l3", title: "Lesson 3.3 — Choose One High-Value Workflow", kind: "lesson", plannedMinutes: 4, description: "A practical way to make an initial choice using value, feasibility, risk and strategic fit. The AI Opportunity Matrix™ is an optional deeper tool; detailed scoring is not required.", videoUrl: "" },
+          { id: "m3-a", title: "Activity — My Priority Opportunity", kind: "activity", plannedMinutes: 3, description: "Identify the main problem your selected workflow should solve and one expected outcome.", output: "Action Card Output 3: The opportunity, why it matters, and the result I want to improve." }
         ]
       },
       {
-        module: "Module 4: Redesigning Work for Humans + AI",
+        module: "Redesigning Work for Humans + AI",
+        phase: "Redesign",
         topics: [
-          {
-            title: "Lesson 4.1 — Don't Automate a Bad Process",
-            description: "Why organizations default to Digitize → Automate → Add AI without questioning the underlying process — and the better path: Understand → Eliminate → Simplify → Redesign → Augment → Automate.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 4.2 — Human + AI Comparative Advantage",
-            description: "AI excels at scale, speed, pattern recognition, and synthesis. Humans remain essential for accountability, ethical judgment, empathy, and strategic judgment. The goal isn't Human OR AI — it's Human × AI.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 4.3 — The Human-Agent Operating Model™",
-            description: "Four roles for redesigned work — AI Executes, AI Recommends, Human Decides, Human Governs — give leaders a shared vocabulary for allocating work between people and systems.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 4.4 — Redesigning the Workflow",
-            description: "Take a real workflow from its 'before' state to an 'after' state built around human-in-the-loop and human-on-the-loop patterns, exception-based intervention, escalation, and approval gates.",
-            videoUrl: ""
-          },
-          {
-            title: "Module 4 Activity — Human + AI Workflow Canvas™",
-            description: "Redesign your selected workflow end-to-end: objective, trigger, human and AI roles, tools/data, decision points, approval gates, exceptions, escalation paths, and success metrics. One of the course's principal artifacts.",
-            videoUrl: ""
-          }
+          { id: "m4-l1", title: "Lesson 4.1 — Don't Automate a Bad Process", kind: "lesson", plannedMinutes: 4, description: "Why AI should not simply be layered onto an inefficient workflow, and why simplification comes before automation.", videoUrl: "" },
+          { id: "m4-l2", title: "Lesson 4.2 — Human + AI Comparative Advantage", kind: "lesson", plannedMinutes: 4, description: "Where AI can assist, and where human judgment, responsibility and intervention remain essential.", videoUrl: "" },
+          { id: "m4-l3", title: "Lesson 4.3 — Redesign One Workflow", kind: "lesson", plannedMinutes: 4, description: "A simple before-and-after workflow showing what AI assists with, what it recommends, what it may execute, and what humans decide or approve.", videoUrl: "" },
+          { id: "m4-a", title: "Activity — My Human + AI Workflow", kind: "activity", plannedMinutes: 3, description: "Define one change to your selected workflow and one important human decision point.", output: "Action Card Output 4: My proposed human + AI workflow improvement." }
         ]
       },
       {
-        module: "Module 5: Governing AI — Trust, Risk and Responsible Autonomy",
+        module: "Governing AI: Trust, Risk and Responsible Autonomy",
+        phase: "Govern",
         topics: [
-          {
-            title: "Lesson 5.1 — The New Risk Equation",
-            description: "Capability ↑ + Autonomy ↑ = Governance ↑. As systems gain the ability to act, organizations must strengthen identity, permissions, monitoring, testing, auditability, and accountability.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 5.2 — The AI Trust Stack™",
-            description: "Six dimensions of trustworthy AI — Reliability, Safety, Security, Privacy, Transparency, Accountability — give leaders a checklist for evaluating any AI system before it's given more authority.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 5.3 — Matching Governance to Autonomy",
-            description: "Returns to the Autonomy Spectrum with one governing principle: govern the decision and the consequence, not merely the model. A marketing-copy assistant and a transaction-approving agent don't need the same controls.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 5.4 — Responsible AI as a Leadership Responsibility",
-            description: "Covers executive accountability, policy, risk ownership, AI governance bodies, model evaluation, data governance, workforce education, vendor considerations, and continuous monitoring.",
-            videoUrl: ""
-          },
-          {
-            title: "Module 5 Activity — AI Governance Checklist",
-            description: "For your priority workflow: what can the AI access or change, what decisions can it make, what requires approval, what happens on failure, and who monitors, stops, and owns the outcome?",
-            videoUrl: ""
-          }
+          { id: "m5-l1", title: "Lesson 5.1 — Why Autonomy Changes the Risk", kind: "lesson", plannedMinutes: 3, description: "Systems that can act need different controls from systems that only generate recommendations.", videoUrl: "" },
+          { id: "m5-l2", title: "Lesson 5.2 — The AI Trust Stack™", kind: "lesson", plannedMinutes: 4, description: "Reliability → Safety → Security → Privacy → Transparency → Accountability, taught as practical leadership questions rather than a technical compliance checklist.", videoUrl: "" },
+          { id: "m5-l3", title: "Lesson 5.3 — Who Is Accountable?", kind: "lesson", plannedMinutes: 3, description: "Human oversight, approval gates, monitoring, intervention and clear ownership of outcomes.", videoUrl: "" },
+          { id: "m5-a", title: "Activity — My Essential Safeguard", kind: "activity", plannedMinutes: 2, description: "Identify the most important risk or control for your selected workflow and who owns the decision.", output: "Action Card Output 5: My priority safeguard and accountable owner." }
         ]
       },
       {
-        module: "Module 6: From AI Ambition to Execution",
+        module: "From AI Ambition to Execution",
+        phase: "Execute",
         topics: [
-          {
-            title: "Lesson 6.1 — Why AI Pilots Don't Scale",
-            description: "The common failure modes — technology-first thinking, no business owner, weak business case, poor data, missing integration, inadequate governance, no measurement — that trap initiatives in endless experimentation.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 6.2 — The Enterprise AI Readiness Model™",
-            description: "Six dimensions — Strategy, Work, Data, Technology, People, Governance — each scored from Emerging to AI-Native, giving leaders a structured view of organizational readiness.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 6.3 — Build, Buy or Partner?",
-            description: "A decision framework for commercial products, enterprise platforms, custom solutions, open-source models, and partners — build where AI creates distinctive advantage, buy where it's increasingly commodity.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 6.4 — Measuring AI Value",
-            description: "Moves beyond 'did people use it?' to four measurement categories — Adoption, Performance, Operational Value, Strategic Value — that connect AI activity to business performance.",
-            videoUrl: ""
-          },
-          {
-            title: "Lesson 6.5 — The Path to the AI-Native Enterprise",
-            description: "The maturity progression from Experiment through Augment, Integrate, Delegate, Orchestrate, to Reimagine. AI maturity is measured by how deeply intelligence changes how the organization creates value — not by how many tools it owns.",
-            videoUrl: ""
-          }
-        ]
-      },
-      {
-        module: "Capstone: Your 90-Day AI Leadership Action Plan",
-        topics: [
-          {
-            title: "Part 1 — The Opportunity",
-            description: "Define the business problem you're solving, why it matters, and what measurable outcome should improve.",
-            videoUrl: ""
-          },
-          {
-            title: "Part 2 — The Workflow",
-            description: "Identify the workflow you'll redesign and where the current bottlenecks are.",
-            videoUrl: ""
-          },
-          {
-            title: "Part 3 — Human + AI",
-            description: "Decide what AI should assist, recommend, or execute — and what humans must decide, approve, or govern.",
-            videoUrl: ""
-          },
-          {
-            title: "Part 4 — Governance",
-            description: "Identify the major risks, the authority AI can have, and the controls and human gates required.",
-            videoUrl: ""
-          },
-          {
-            title: "Part 5 — Success Measures",
-            description: "Define 3–5 measurable indicators of success.",
-            videoUrl: ""
-          },
-          {
-            title: "Part 6 — 90-Day Plan",
-            description: "Days 1–30: Discover & Design. Days 31–60: Pilot & Learn. Days 61–90: Measure & Decide — stop, improve, expand, or scale.",
-            videoUrl: ""
-          }
+          { id: "m6-l1", title: "Lesson 6.1 — Why AI Pilots Don't Scale", kind: "lesson", plannedMinutes: 4, description: "The common causes of stalled AI initiatives: unclear business value, weak ownership, data or workflow readiness gaps, inadequate governance and missing success measures.", videoUrl: "" },
+          { id: "m6-l2", title: "Lesson 6.2 — What Must Be Ready?", kind: "lesson", plannedMinutes: 4, description: "The six dimensions of the Enterprise AI Readiness Model™ — Strategy → Work → Data → Technology → People → Governance — used as a concise leadership diagnostic, not a full organizational assessment.", videoUrl: "" },
+          { id: "m6-l3", title: "Lesson 6.3 — Your First 90 Days", kind: "lesson", plannedMinutes: 6, description: "Days 1–30: Discover and Design. Days 31–60: Pilot and Learn. Days 61–90: Measure and Decide. Emphasizes measurable outcomes and responsible experimentation.", videoUrl: "" },
+          { id: "m6-a", title: "Final Activity — My 90-Day AI Leadership Action Card", kind: "activity", plannedMinutes: 4, description: "Complete the final section of your Action Card and leave with one practical page: your workflow, an AI capability, an autonomy decision, a high-value opportunity, a workflow improvement, an essential safeguard with its accountable owner, and three next actions across 90 days.", output: "Final deliverable: My AI Leadership Action Card." }
         ]
       }
     ],
     assignment: {
-      title: "Your 90-Day AI Leadership Action Plan",
-      description: "Develop a one-page executive plan covering the opportunity, the workflow to redesign, human + AI roles, governance and risk, success measures, and a 90-day Discover & Design / Pilot & Learn / Measure & Decide roadmap.",
-      format: "One-page executive plan (worksheet template provided in the AI Strategy for Leaders Toolkit)"
+      heading: "Your Cumulative Activity",
+      title: "My AI Leadership Action Card",
+      description: "Choose one workflow, challenge or organizational process and build one practical page across the six modules, rather than six unrelated assignments. You finish with one workflow or challenge, one potential AI capability, one appropriate autonomy decision, one high-value opportunity, one proposed workflow improvement, one essential safeguard with its accountable owner, and three next actions across 90 days.",
+      format: "One-page Action Card, built a little at a time across the six modules (about 18 minutes of activities in total)",
+      outputs: [
+        { module: "Module 1 — Understand", text: "My chosen workflow and the AI capability that could improve it." },
+        { module: "Module 2 — Anticipate", text: "My appropriate AI autonomy decision." },
+        { module: "Module 3 — Identify", text: "The opportunity, why it matters, and the result I want to improve." },
+        { module: "Module 4 — Redesign", text: "My proposed human + AI workflow improvement." },
+        { module: "Module 5 — Govern", text: "My priority safeguard and accountable owner." },
+        { module: "Module 6 — Execute", text: "Three next actions across 90 days, completing the one-page card." }
+      ]
     }
   },
   {

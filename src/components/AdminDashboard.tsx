@@ -38,7 +38,10 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/Button';
 import { courses as staticCourses } from '../data/courses';
+import { courseDuration } from '../lib/courseDuration';
 import { WebinarAdmin } from './admin/WebinarAdmin';
+import { CurriculumEditor } from './admin/CurriculumEditor';
+import { LaunchReadiness } from './admin/LaunchReadiness';
 import { UserProfile, Enrollment, Course } from '../types';
 
 import { 
@@ -351,9 +354,28 @@ export const AdminDashboard: React.FC = () => {
         },
         body: JSON.stringify({ courses: staticCourses })
       });
-      const data = await safeJson(response);
+      let data = await safeJson(response);
       if (!response.ok) throw new Error(data.error || 'Sync failed');
-      setStatus({ type: 'success', message: `Courses synced — ${data.synced} course${data.synced !== 1 ? 's' : ''} written.` });
+
+      // The server refuses to drop video/material links that exist only in the database. Ask before replacing them.
+      if (Array.isArray(data.blocked) && data.blocked.length > 0) {
+        const lines = data.blocked.map((b: any) => `${b.id}: ${b.lostMedia.length} link(s) would be removed`).join('\n');
+        if (window.confirm(`Syncing will remove media links you added in the database:\n\n${lines}\n\nThe current version is archived first. Replace them anyway?`)) {
+          const retry = await fetch('/api/admin?resource=sync-courses', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ courses: staticCourses, confirmMediaReplacement: data.blocked.map((b: any) => b.id) })
+          });
+          data = await safeJson(retry);
+          if (!retry.ok) throw new Error(data.error || 'Sync failed');
+        } else {
+          setStatus({ type: 'error', message: `Sync finished with ${data.blocked.length} course(s) skipped to protect media links.` });
+          return;
+        }
+      }
+      const archivedNote = data.archived?.length ? ` Previous curriculum archived (${data.archived.length}).` : '';
+      const draftNote = data.drafted?.length ? ` ${data.drafted.length} launch-gated course${data.drafted.length !== 1 ? 's' : ''} saved as a DRAFT (not live).` : '';
+      setStatus({ type: 'success', message: `Courses synced — ${data.synced} course${data.synced !== 1 ? 's' : ''} written.${archivedNote}${draftNote}` });
     } catch (error: any) {
       console.error('Error syncing courses:', error);
       setStatus({ type: 'error', message: error.message || 'Failed to sync courses.' });
@@ -414,11 +436,43 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  /** Launch-gated courses are edited as a draft and only reach learners through an explicit publish. */
+  const isGated = (courseId: string) => !!staticCourses.find((c) => c.id === courseId)?.launchGate;
+
+  const adminFetch = async (resource: string, init?: RequestInit, extraQuery = '') => {
+    const idToken = await auth.currentUser?.getIdToken();
+    const response = await fetch(`/api/admin?resource=${resource}${extraQuery}`, {
+      ...init,
+      headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    });
+    const data = await safeJson(response);
+    if (!response.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  };
+
+  const loadDraftCurriculum = async (courseId: string): Promise<any[] | null> => {
+    const data = await adminFetch('course-draft-get', undefined, `&courseId=${encodeURIComponent(courseId)}`);
+    return data.exists ? data.course?.curriculum ?? [] : null;
+  };
+
   const handleSaveCurriculum = async (courseId: string, curriculum: any[]) => {
     setSyncing(true);
     try {
-      await updateDoc(doc(db, 'courses', courseId), { curriculum });
-      setStatus({ type: 'success', message: 'Curriculum updated successfully!' });
+      // Planned totals are derived, never typed by hand. The headline duration is only rewritten when every
+      // required lesson has a planned duration, so a half-filled editor can never publish a wrong number.
+      const d = courseDuration({ curriculum });
+      const derived = d.complete && d.totalMinutes > 0
+        ? { duration: `${d.totalMinutes} minutes total`, plannedDuration: { videoMinutes: d.videoMinutes, activityMinutes: d.activityMinutes, totalMinutes: d.totalMinutes } }
+        : {};
+      // JSON round-trip drops `undefined` fields (Firestore rejects them), e.g. a cleared planned-minutes box
+      const clean = JSON.parse(JSON.stringify(curriculum));
+      if (isGated(courseId)) {
+        await adminFetch('course-draft-save', { method: 'POST', body: JSON.stringify({ courseId, curriculum: clean, ...derived }) });
+        setStatus({ type: 'success', message: 'Draft saved. Learners will not see it until you publish from Launch readiness.' });
+      } else {
+        await updateDoc(doc(db, 'courses', courseId), { curriculum: clean, ...derived });
+        setStatus({ type: 'success', message: 'Curriculum updated successfully!' });
+      }
       setEditingCourse(null);
     } catch (error) {
       console.error('Error updating curriculum:', error);
@@ -428,219 +482,6 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const CurriculumEditor = ({ course, onCancel }: { course: Course, onCancel: () => void }) => {
-    const [localCurriculum, setLocalCurriculum] = useState<any[]>(course.curriculum || []);
-
-    const addModule = () => {
-      setLocalCurriculum([...localCurriculum, { module: 'New Module', topics: [] }]);
-    };
-
-    const removeModule = (mIdx: number) => {
-      const newCur = [...localCurriculum];
-      newCur.splice(mIdx, 1);
-      setLocalCurriculum(newCur);
-    };
-
-    const updateModuleTitle = (mIdx: number, title: string) => {
-      const newCur = [...localCurriculum];
-      newCur[mIdx].module = title;
-      setLocalCurriculum(newCur);
-    };
-
-    const addLesson = (mIdx: number) => {
-      const newCur = [...localCurriculum];
-      newCur[mIdx].topics.push({ title: 'New Lesson', description: '' });
-      setLocalCurriculum(newCur);
-    };
-
-    const removeLesson = (mIdx: number, lIdx: number) => {
-      const newCur = [...localCurriculum];
-      newCur[mIdx].topics.splice(lIdx, 1);
-      setLocalCurriculum(newCur);
-    };
-
-    const updateLesson = (mIdx: number, lIdx: number, data: any) => {
-      const newCur = [...localCurriculum];
-      newCur[mIdx].topics[lIdx] = { ...newCur[mIdx].topics[lIdx], ...data };
-      setLocalCurriculum(newCur);
-    };
-
-    return (
-      <div className="p-8 space-y-8 animate-in fade-in duration-500">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900 mb-1">Curriculum Editor: {course.title}</h2>
-            <p className="text-slate-500 text-sm">Add modules, lessons, and upload relevant materials or videos.</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={onCancel} className="rounded-xl">Cancel</Button>
-            <Button 
-              onClick={() => handleSaveCurriculum(course.id, localCurriculum)} 
-              disabled={syncing}
-              className="rounded-xl flex items-center gap-2 bg-blue-900"
-            >
-              {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-              Save All Changes
-            </Button>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          {localCurriculum.map((mod, mIdx) => (
-            <div key={mIdx} className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-              <div className="p-4 bg-slate-100/50 flex items-center justify-between border-b border-slate-200">
-                <div className="flex items-center gap-4 flex-1">
-                  <GripVertical className="w-5 h-5 text-slate-400" />
-                  <input
-                    type="text"
-                    value={mod.module}
-                    onChange={(e) => updateModuleTitle(mIdx, e.target.value)}
-                    className="bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-900 font-bold text-slate-900 outline-none transition-all px-1 py-0.5 flex-1"
-                  />
-                </div>
-                <button
-                  onClick={() => removeModule(mIdx)}
-                  className="p-2 text-slate-400 hover:text-rose-600 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="p-4 space-y-4">
-                {mod.topics?.map((lesson: any, lIdx: number) => (
-                  <div key={lIdx} className="bg-white p-4 rounded-xl border border-slate-200 space-y-4 transition-all hover:border-slate-300 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
-                        <span className="text-xs font-bold text-slate-400 w-6">L{lIdx + 1}</span>
-                        <input
-                          type="text"
-                          value={lesson.title}
-                          onChange={(e) => updateLesson(mIdx, lIdx, { title: e.target.value })}
-                          className="bg-transparent border-b border-slate-100 hover:border-slate-300 focus:border-blue-900 font-semibold text-slate-900 outline-none transition-all px-1 py-0.5 flex-1"
-                          placeholder="Lesson Title"
-                        />
-                      </div>
-                      <button
-                        onClick={() => removeLesson(mIdx, lIdx)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Description</label>
-                        <textarea
-                          value={lesson.description || ''}
-                          onChange={(e) => updateLesson(mIdx, lIdx, { description: e.target.value })}
-                          className="w-full text-sm p-3 rounded-lg border border-slate-100 bg-slate-50/30 focus:bg-white transition-all outline-none focus:ring-1 focus:ring-blue-900/10 resize-none h-20"
-                          placeholder="What will students learn in this lesson..."
-                        />
-                      </div>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Video URL or Upload</label>
-                          <div className="flex gap-2">
-                            <div className="relative flex-1">
-                              <Video className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                              <input
-                                type="text"
-                                value={lesson.videoUrl || ''}
-                                onChange={(e) => updateLesson(mIdx, lIdx, { videoUrl: e.target.value })}
-                                className="w-full text-xs pl-9 pr-4 py-2 rounded-lg border border-slate-100 bg-slate-50/30 focus:bg-white outline-none focus:ring-1 focus:ring-blue-900/10"
-                                placeholder="Paste video URL (YouTube, Vimeo, etc.)"
-                              />
-                            </div>
-                            <div className="relative">
-                              <input
-                                type="file"
-                                id={`video-${mIdx}-${lIdx}`}
-                                className="hidden"
-                                accept="video/*"
-                                onChange={async (e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    const url = await handleFileUpload(file);
-                                    if (url) updateLesson(mIdx, lIdx, { videoUrl: url });
-                                  }
-                                }}
-                              />
-                              <label
-                                htmlFor={`video-${mIdx}-${lIdx}`}
-                                className="p-2 bg-blue-50 text-blue-900 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors flex items-center justify-center"
-                                title="Upload Video"
-                              >
-                                {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Materials / Links</label>
-                          <div className="flex gap-2">
-                            <div className="relative flex-1">
-                              <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                              <input
-                                type="text"
-                                value={lesson.materialUrl || ''}
-                                onChange={(e) => updateLesson(mIdx, lIdx, { materialUrl: e.target.value })}
-                                className="w-full text-xs pl-9 pr-4 py-2 rounded-lg border border-slate-100 bg-slate-50/30 focus:bg-white outline-none focus:ring-1 focus:ring-blue-900/10"
-                                placeholder="External resource link"
-                              />
-                            </div>
-                            <div className="relative">
-                              <input
-                                type="file"
-                                id={`material-${mIdx}-${lIdx}`}
-                                className="hidden"
-                                onChange={async (e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    const url = await handleFileUpload(file);
-                                    if (url) updateLesson(mIdx, lIdx, { materialUrl: url });
-                                  }
-                                }}
-                              />
-                              <label
-                                htmlFor={`material-${mIdx}-${lIdx}`}
-                                className="p-2 bg-blue-50 text-blue-900 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors flex items-center justify-center"
-                                title="Upload Material"
-                              >
-                                {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <button
-                  onClick={() => addLesson(mIdx)}
-                  className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 font-bold text-sm hover:border-blue-900/20 hover:text-blue-900 hover:bg-blue-50/50 transition-all flex items-center justify-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Lesson
-                </button>
-              </div>
-            </div>
-          ))}
-
-          <button
-            onClick={addModule}
-            className="w-full py-6 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 font-bold hover:border-blue-900/30 hover:text-blue-900 hover:bg-blue-50 transition-all flex items-center justify-center gap-2 group"
-          >
-            <div className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center group-hover:bg-blue-900 group-hover:text-white transition-all">
-              <Plus className="w-5 h-5" />
-            </div>
-            Add New Module
-          </button>
-        </div>
-      </div>
-    );
-  };
 
   const filteredUsers = users.filter(u => 
     u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -851,7 +692,17 @@ export const AdminDashboard: React.FC = () => {
         {/* Content */}
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
           {editingCourse ? (
-             <CurriculumEditor course={editingCourse} onCancel={() => setEditingCourse(null)} />
+             <CurriculumEditor
+               key={editingCourse.id}
+               course={editingCourse}
+               gated={isGated(editingCourse.id)}
+               busy={syncing}
+               isUploading={isUploading}
+               onCancel={() => setEditingCourse(null)}
+               onUpload={handleFileUpload}
+               onSave={(cur) => handleSaveCurriculum(editingCourse.id, cur)}
+               loadDraft={() => loadDraftCurriculum(editingCourse.id)}
+             />
           ) : (
             <>
               <AnimatePresence>
@@ -1158,6 +1009,9 @@ export const AdminDashboard: React.FC = () => {
 
           {activeTab === 'courses' && (
             <div className="overflow-x-auto">
+              {staticCourses.filter((c) => c.launchGate).map((c) => (
+                <LaunchReadiness key={c.id} courseId={c.id} courseTitle={c.title} adminFetch={adminFetch} />
+              ))}
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">

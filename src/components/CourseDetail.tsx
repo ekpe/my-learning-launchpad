@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { courses } from '../data/courses';
 import { Button } from './ui/Button';
-import { Clock, Users, ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
+import { Clock, Users, ArrowLeft, ArrowRight, CheckCircle2, ClipboardList, Loader2, PlayCircle, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
@@ -10,18 +10,21 @@ import { doc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { sendEmail } from '../services/emailService';
 import { AuthModal } from './AuthModal';
 import { DiscussionForum } from './DiscussionForum';
-import { Course } from '../types';
+import { Course, Enrollment } from '../types';
+import { resolveTrack } from '../lib/courseProgress';
+import { resolveCourse } from '../hooks/useLiveCourses';
 import { logEvent, AnalyticsEvent } from '../services/analyticsService';
+import { courseDuration, moduleDuration } from '../lib/courseDuration';
 
 export const CourseDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [enrollmentStatus, setEnrollmentStatus] = useState<'NONE' | 'ENROLLED' | 'IN_PROGRESS' | 'COMPLETED'>('NONE');
+  const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isLoadingEnrollment, setIsLoadingEnrollment] = useState(true);
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'CURRICULUM' | 'DISCUSSION'>('OVERVIEW');
-  const [course, setCourse] = useState<Course | undefined>(courses.find(c => c.id === id));
+  const [course, setCourse] = useState<Course | undefined>(() => resolveCourse(id ?? '', null));
   const [isLoadingCourse, setIsLoadingCourse] = useState(true);
 
   useEffect(() => {
@@ -31,9 +34,8 @@ export const CourseDetail = () => {
     }
 
     const unsubscribe = onSnapshot(doc(db, 'courses', id), (docSnap) => {
-      if (docSnap.exists()) {
-        setCourse(docSnap.data() as Course);
-      }
+      // A launch-gated course is shown only from its published (live) record, never from the static draft.
+      setCourse(resolveCourse(id, docSnap.exists() ? (docSnap.data() as Course) : null));
       setIsLoadingCourse(false);
     }, (error) => {
       console.error("Error fetching course:", error);
@@ -52,9 +54,9 @@ export const CourseDetail = () => {
     const enrollmentId = `${user.uid}_${id}`;
     const unsubscribe = onSnapshot(doc(db, 'enrollments', enrollmentId), (docSnap) => {
       if (docSnap.exists()) {
-        setEnrollmentStatus(docSnap.data().status);
+        setEnrollment(docSnap.data() as Enrollment);
       } else {
-        setEnrollmentStatus('NONE');
+        setEnrollment(null);
       }
       setIsLoadingEnrollment(false);
     }, (error) => {
@@ -104,7 +106,8 @@ export const CourseDetail = () => {
         courseId: id,
         status: 'ENROLLED',
         enrolledAt: serverTimestamp(),
-        progress: 0
+        progress: 0,
+        ...(course.curriculumVersion ? { curriculumVersion: course.curriculumVersion } : {})
       });
 
       logEvent(AnalyticsEvent.COURSE_ENROLLMENT, {
@@ -168,6 +171,21 @@ export const CourseDetail = () => {
     );
   }
 
+  const isV2 = (course.curriculumVersion ?? 1) >= 2;
+  const track = resolveTrack(course, enrollment);
+  const enrolled = !!enrollment;
+  // Finished this course at any curriculum version (the original result is never lost).
+  const finishedBefore = track.status === 'COMPLETED' || track.legacy?.status === 'COMPLETED';
+  const legacyNotStarted = enrolled && track.source === 'none' && track.isLegacyEnrollment;
+  const duration = courseDuration(course);
+  const showPlanned = duration.complete && duration.totalMinutes > 0;
+  const paragraphs = (course.fullDescription || course.description).split(/\n{2,}/);
+  const outcomes = course.outcomes ?? course.learningObjectives;
+  const nextSteps = (course.nextStepCourseIds ?? [])
+    .map((cid) => courses.find((c) => c.id === cid))
+    .filter((c): c is Course => !!c);
+  const publishedResources = (course.optionalResources ?? []).filter((r) => r.available && r.url);
+
   return (
     <div className="min-h-screen bg-white pt-32 pb-24">
       <div className="max-w-7xl mx-auto px-6">
@@ -177,7 +195,7 @@ export const CourseDetail = () => {
         </Link>
 
         {/* Tabs */}
-        <div className="flex items-center gap-8 border-b border-slate-100 mb-12">
+        <div className="flex items-center gap-5 sm:gap-8 border-b border-slate-100 mb-12 overflow-x-auto">
           {[
             { id: 'OVERVIEW', label: 'Overview' },
             { id: 'CURRICULUM', label: 'Curriculum' },
@@ -211,15 +229,25 @@ export const CourseDetail = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                 >
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-900 text-xs font-semibold uppercase tracking-wider mb-6">
-                    {course.isFree ? 'Free Course' : 'Executive Track'}
+                  <div className="flex flex-wrap items-center gap-2 mb-6">
+                    <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-900 text-xs font-semibold uppercase tracking-wider">
+                      {course.trackLabel || (course.isFree ? 'Free Course' : 'Executive Track')}
+                    </span>
+                    {course.trackLabel && course.isFree && (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-700 text-white text-xs font-semibold uppercase tracking-wider">Free Course</span>
+                    )}
                   </div>
-                  <h1 className="text-4xl md:text-5xl font-bold text-slate-900 leading-tight mb-6">
+                  <h1 className="text-4xl md:text-5xl font-bold text-slate-900 leading-tight mb-4">
                     {course.title}
                   </h1>
-                  <p className="text-xl text-slate-600 mb-8 leading-relaxed">
-                    {course.fullDescription || course.description}
-                  </p>
+                  {course.subtitle && (
+                    <p className="text-2xl font-semibold text-blue-900 mb-6 leading-snug">{course.subtitle}</p>
+                  )}
+                  <div className="space-y-5 mb-8">
+                    {paragraphs.map((p, i) => (
+                      <p key={i} className="text-xl text-slate-600 leading-relaxed">{p}</p>
+                    ))}
+                  </div>
 
                   <div className="grid sm:grid-cols-2 gap-6 mb-10">
                     <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -229,6 +257,7 @@ export const CourseDetail = () => {
                       <div>
                         <p className="text-xs text-slate-500 uppercase font-bold tracking-wider">Duration</p>
                         <p className="font-bold text-slate-900">{course.duration}</p>
+                        {course.durationStatus === 'planned' && <p className="text-xs text-slate-500">Planned run time</p>}
                       </div>
                     </div>
                     <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -242,11 +271,18 @@ export const CourseDetail = () => {
                     </div>
                   </div>
 
-                  {course.learningObjectives && (
+                  {outcomes && (
                     <div className="mb-10">
-                      <h3 className="text-2xl font-bold text-slate-900 mb-6">Learning Objectives</h3>
+                      <h3 className="text-2xl font-bold text-slate-900 mb-2">
+                        {isV2 && showPlanned ? `What You'll Achieve in ${duration.totalMinutes} Minutes` : 'Learning Objectives'}
+                      </h3>
+                      {isV2 && showPlanned && (
+                        <p className="text-sm text-slate-600 mb-6">
+                          {duration.videoMinutes} minutes of video plus {duration.activityMinutes} minutes of practical activities (planned).
+                        </p>
+                      )}
                       <ul className="grid sm:grid-cols-2 gap-4">
-                        {course.learningObjectives.map((objective, idx) => (
+                        {outcomes.map((objective, idx) => (
                           <li key={idx} className="flex items-start gap-3 text-slate-600 text-sm">
                             <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
                             {objective}
@@ -262,7 +298,21 @@ export const CourseDetail = () => {
                         <Loader2 className="w-5 h-5 animate-spin mr-2" />
                         Loading...
                       </Button>
-                    ) : enrollmentStatus !== 'NONE' ? (
+                    ) : legacyNotStarted ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5" data-testid="legacy-cta">
+                        <p className="font-semibold text-slate-900">
+                          {track.legacy?.status === 'COMPLETED'
+                            ? 'You completed the original version of this course. Your completion and certificate are unchanged.'
+                            : 'This course has been updated. Your earlier progress is saved.'}
+                        </p>
+                        <div className="mt-4 flex flex-wrap gap-3">
+                          <Link to={`/course/${course.id}/lesson/0/0`}>
+                            <Button size="lg" className="rounded-full px-8 font-bold">Take the new 90-minute course</Button>
+                          </Link>
+                          <Link to="/dashboard"><Button size="lg" variant="outline" className="rounded-full px-8">Go to Dashboard</Button></Link>
+                        </div>
+                      </div>
+                    ) : enrolled ? (
                       <Link to="/dashboard">
                         <Button size="lg" className="rounded-full px-10 font-bold bg-green-600 hover:bg-green-700">
                           Go to Dashboard
@@ -281,21 +331,64 @@ export const CourseDetail = () => {
                         {course.isFree ? 'Enroll for Free' : 'Enroll Now'}
                       </Button>
                     )}
-                    <Button variant="outline" size="lg" className="rounded-full px-10">
-                      Download Syllabus
-                    </Button>
+                    {!isV2 && (
+                      <Button variant="outline" size="lg" className="rounded-full px-10">
+                        Download Syllabus
+                      </Button>
+                    )}
                   </div>
 
                   {course.assignment && (
                     <div className="p-8 bg-blue-900 rounded-3xl text-white">
-                      <h3 className="text-2xl font-bold mb-4">Practical Assignment</h3>
-                      <h4 className="text-amber-400 font-bold mb-2">{course.assignment.title}</h4>
+                      <h3 className="text-2xl font-bold mb-4">{course.assignment.heading || 'Practical Assignment'}</h3>
+                      <h4 className="text-amber-300 font-bold mb-2 text-xl">{course.assignment.title}</h4>
                       <p className="text-blue-100 text-sm mb-6 leading-relaxed">
                         {course.assignment.description}
                       </p>
+                      {course.assignment.outputs && (
+                        <ol className="mb-6 space-y-2">
+                          {course.assignment.outputs.map((o, i) => (
+                            <li key={i} className="text-sm text-blue-50">
+                              <span className="font-bold text-amber-300">{o.module}:</span> {o.text}
+                            </li>
+                          ))}
+                        </ol>
+                      )}
                       <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider bg-blue-800/50 w-fit px-4 py-2 rounded-full border border-blue-700">
                         Format: {course.assignment.format}
                       </div>
+                    </div>
+                  )}
+
+                  {finishedBefore && nextSteps.length > 0 && (
+                    <div className="mt-10 p-8 bg-navy-900 rounded-3xl text-white">
+                      <h3 className="text-2xl font-bold mb-3">Ready to Put Your AI Strategy into Action?</h3>
+                      <p className="text-blue-100 mb-5">When you are ready to go further, explore our programs.</p>
+                      <ul className="grid sm:grid-cols-2 gap-3">
+                        {nextSteps.map((c) => (
+                          <li key={c.id}>
+                            <Link to={`/course/${c.id}`} className="flex h-full items-center justify-between gap-3 rounded-2xl bg-white/10 p-4 font-semibold hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
+                              <span>{c.title}</span>
+                              <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {publishedResources.length > 0 && (
+                    <div className="mt-10">
+                      <h3 className="text-2xl font-bold text-slate-900 mb-2">Explore Further — Optional Resources</h3>
+                      <p className="text-sm text-slate-600 mb-4">Optional. These are not part of the 90 minutes and are not needed to complete the course.</p>
+                      <ul className="space-y-3">
+                        {publishedResources.map((r) => (
+                          <li key={r.title}>
+                            <a href={r.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-900 underline">{r.title}</a>
+                            {r.description && <p className="text-sm text-slate-600">{r.description}</p>}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                 </motion.div>
@@ -308,21 +401,52 @@ export const CourseDetail = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                 >
-                  <h3 className="text-2xl font-bold text-slate-900 mb-8">Course Curriculum</h3>
-                  <div className="space-y-6">
-                    {course.curriculum?.map((module, idx) => (
-                      <div key={idx} className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                        <h4 className="font-bold text-blue-900 mb-4">{module.module}</h4>
-                        <ul className="space-y-3">
-                          {module.topics.map((topic, tIdx) => (
-                            <li key={tIdx} className="flex items-start gap-3 text-slate-600 text-sm">
-                              <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
-                              {topic.title}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
+                  <h3 className="text-2xl font-bold text-slate-900 mb-2">Course Curriculum</h3>
+                  {showPlanned && (
+                    <p className="text-sm text-slate-600 mb-8">
+                      {duration.totalMinutes} minutes planned: {duration.videoMinutes} of video and {duration.activityMinutes} of activities. Durations are planned, not measured run times.
+                    </p>
+                  )}
+                  <div className="space-y-4">
+                    {course.curriculum?.map((module, idx) => {
+                      const md = moduleDuration(module);
+                      return (
+                        <details key={idx} className="group rounded-2xl border border-slate-100 bg-slate-50" open={!isV2}>
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-6 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-900">
+                            <span>
+                              {module.phase && <span className="block text-xs font-bold uppercase tracking-widest text-amber-700">Module {idx + 1} · {module.phase}</span>}
+                              <span className="block font-bold text-blue-900">{module.module}</span>
+                            </span>
+                            <span className="flex shrink-0 items-center gap-3 text-sm text-slate-600">
+                              {md.complete && md.totalMinutes > 0 && <span>{md.totalMinutes} min</span>}
+                              <ChevronDown className="h-5 w-5 transition-transform group-open:rotate-180" aria-hidden="true" />
+                            </span>
+                          </summary>
+                          <ul className="space-y-4 px-6 pb-6">
+                            {module.topics.map((topic, tIdx) => (
+                              <li key={tIdx} className={`flex items-start gap-3 text-sm ${topic.kind === 'activity' ? 'rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200' : 'text-slate-600'}`}>
+                                {topic.kind === 'activity' ? (
+                                  <ClipboardList className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" aria-hidden="true" />
+                                ) : isV2 ? (
+                                  <PlayCircle className="mt-0.5 h-5 w-5 shrink-0 text-blue-700" aria-hidden="true" />
+                                ) : (
+                                  <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600" aria-hidden="true" />
+                                )}
+                                <span className="flex-1">
+                                  <span className="block font-semibold text-slate-900">
+                                    {topic.title}
+                                    {topic.optional && <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-700">Optional</span>}
+                                  </span>
+                                  {isV2 && topic.description && <span className="mt-1 block text-slate-600">{topic.description}</span>}
+                                  {topic.kind === 'activity' && topic.output && <span className="mt-1 block font-semibold text-amber-900">{topic.output}</span>}
+                                </span>
+                                {typeof topic.plannedMinutes === 'number' && <span className="shrink-0 text-xs text-slate-600">{topic.plannedMinutes} min</span>}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      );
+                    })}
                   </div>
                 </motion.div>
               )}
@@ -352,15 +476,15 @@ export const CourseDetail = () => {
               </div>
               
               <div className="p-8 bg-slate-50 rounded-3xl border border-slate-100">
-                <h4 className="font-bold text-slate-900 mb-4">Course Features</h4>
+                <h4 className="font-bold text-slate-900 mb-4">{course.benefits ? 'What You Get' : 'Course Features'}</h4>
                 <ul className="space-y-4">
-                  {[
+                  {(course.benefits ?? [
                     'Lifetime access',
                     'Mobile compatible',
                     'Certificate of completion',
                     'Practical assignments',
                     'Discussion forum access'
-                  ].map((feature, idx) => (
+                  ]).map((feature, idx) => (
                     <li key={idx} className="flex items-center gap-3 text-sm text-slate-600">
                       <CheckCircle2 className="w-4 h-4 text-blue-600" />
                       {feature}

@@ -13,6 +13,7 @@ import { initializeApp as initializeClientApp } from "firebase/app";
 import { getFirestore as getClientFirestore, doc, setDoc, serverTimestamp as clientTimestamp } from "firebase/firestore";
 import { readFileSync, mkdirSync, existsSync } from "fs";
 import multer from "multer";
+import { handleCourseAdminOp, syncCourseList } from "./api/_lib/course-admin.js";
 
 dotenv.config();
 
@@ -430,25 +431,26 @@ async function startServer() {
       }
 
       if (req.method === "POST" && resource === "sync-courses") {
-        const { courses: courseList } = req.body;
+        const { courses: courseList, confirmMediaReplacement } = req.body;
         if (!Array.isArray(courseList) || courseList.length === 0) {
           return res.status(400).json({ error: "courses array is required" });
         }
-        let synced = 0;
-        const errors: string[] = [];
-        for (const course of courseList) {
-          if (!course.id) { errors.push(`Course missing id: ${course.title}`); continue; }
-          try {
-            await db.collection("courses").doc(course.id).set(
-              { ...course, updatedAt: FieldValue.serverTimestamp() },
-              { merge: true }
-            );
-            synced++;
-          } catch (e: any) {
-            errors.push(`${course.id}: ${e.message}`);
-          }
-        }
-        return res.json({ success: true, synced, errors: errors.length > 0 ? errors : undefined });
+        const r = await syncCourseList(db, courseList, () => FieldValue.serverTimestamp(), {
+          confirmMediaReplacement: Array.isArray(confirmMediaReplacement) ? confirmMediaReplacement : [],
+        });
+        return res.json({
+          success: r.blocked.length === 0 && r.errors.length === 0,
+          synced: r.synced,
+          archived: r.archived.length ? r.archived : undefined,
+          drafted: r.drafted.length ? r.drafted : undefined,
+          blocked: r.blocked.length ? r.blocked : undefined,
+          errors: r.errors.length ? r.errors : undefined,
+        });
+      }
+
+      if (typeof resource === "string" && resource.startsWith("course-")) {
+        const out = await handleCourseAdminOp(db, { method: req.method, resource, query: req.query as any, body: req.body }, () => FieldValue.serverTimestamp());
+        if (out) return res.status(out.status).json(out.body);
       }
 
       if (req.method === "POST" && resource === "sync-users") {

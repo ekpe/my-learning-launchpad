@@ -7,6 +7,7 @@ import { courses as staticCourses } from '../data/courses';
 import { db } from '../firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { Course } from '../types';
+import { publicStaticCourses } from '../hooks/useLiveCourses';
 
 interface CourseCardProps {
   id: string;
@@ -18,9 +19,11 @@ interface CourseCardProps {
   image: string;
   isFree?: boolean;
   featured?: boolean;
+  subtitle?: string;
+  trackLabel?: string;
 }
 
-const CourseCard: React.FC<CourseCardProps> = ({ id, title, description, duration, format, audience, image, isFree, featured }) => {
+const CourseCard: React.FC<CourseCardProps> = ({ id, title, description, duration, format, audience, image, isFree, featured, subtitle, trackLabel }) => {
   return (
     <motion.div 
       whileHover={{ y: -5 }}
@@ -39,11 +42,12 @@ const CourseCard: React.FC<CourseCardProps> = ({ id, title, description, duratio
           referrerPolicy="no-referrer"
         />
         <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold text-blue-900 uppercase tracking-wider">
-          Executive Track
+          {trackLabel || 'Executive Track'}
         </div>
       </div>
       <div className={`p-6 flex flex-col flex-grow ${featured ? 'md:p-10 md:w-3/5' : ''}`}>
         <h4 className={`${featured ? 'text-2xl md:text-3xl' : 'text-xl'} font-bold text-slate-900 mb-3 leading-tight`}>{title}</h4>
+        {subtitle && <p className="text-sm font-semibold text-blue-900 -mt-1 mb-3">{subtitle}</p>}
         <p className="text-slate-600 text-sm mb-6 line-clamp-3 flex-grow">{description}</p>
         
         <div className={`grid ${featured ? 'grid-cols-2 gap-4' : 'space-y-3'} mb-6`}>
@@ -76,7 +80,7 @@ const CourseCard: React.FC<CourseCardProps> = ({ id, title, description, duratio
 
 export const Courses = () => {
   const [displayCourses, setDisplayCourses] = useState<Course[]>(() => {
-    return [...staticCourses].sort((a, b) => {
+    return publicStaticCourses().sort((a, b) => {
       const aFree = !!a.isFree;
       const bFree = !!b.isFree;
       if (aFree && !bFree) return -1;
@@ -88,7 +92,8 @@ export const Courses = () => {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'courses'), (snapshot) => {
-      let finalCourses = [...staticCourses];
+      // Launch-gated courses appear only once a live (published) record exists.
+      let finalCourses = publicStaticCourses();
       
       if (!snapshot.empty) {
         const dbCourses = snapshot.docs.map(doc => doc.data() as Course);
@@ -170,7 +175,9 @@ export const Courses = () => {
                 <CourseCard 
                   id={displayCourses[0].id}
                   title={displayCourses[0].title}
-                  description={displayCourses[0].description}
+                  description={displayCourses[0].cardDescription || displayCourses[0].description}
+                  subtitle={displayCourses[0].subtitle}
+                  trackLabel={displayCourses[0].trackLabel}
                   duration={displayCourses[0].duration}
                   format={displayCourses[0].format}
                   audience={displayCourses[0].audience}
@@ -188,7 +195,9 @@ export const Courses = () => {
                   key={course.id} 
                   id={course.id}
                   title={course.title}
-                  description={course.description}
+                  description={course.cardDescription || course.description}
+                  subtitle={course.subtitle}
+                  trackLabel={course.trackLabel}
                   duration={course.duration}
                   format={course.format}
                   audience={course.audience}

@@ -66,6 +66,32 @@ service cloud.firestore {
              data.certificateId is string;
     }
 
+    // One Action Card output: { text, rev, updatedAt }. Keep MAX in step with src/lib/actionCardLogic.ts.
+    function isValidActionOutput(o) {
+      return o is map &&
+             o.keys().hasAll(['text', 'rev']) &&
+             o.text is string && o.text.size() <= 800 &&
+             o.rev is int && o.rev >= 1;
+    }
+
+    // actionCards/{uid}_{courseId}: owner-only, six independent outputs m1..m6, tied to an existing enrollment.
+    function isValidActionCard(data, cardId) {
+      return data.keys().hasAll(['userId', 'courseId', 'outputs']) &&
+             data.keys().hasOnly(['userId', 'courseId', 'outputs', 'updatedAt']) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.courseId is string &&
+             cardId == request.auth.uid + '_' + data.courseId &&
+             data.outputs is map &&
+             data.outputs.keys().hasOnly(['m1', 'm2', 'm3', 'm4', 'm5', 'm6']) &&
+             (!('m1' in data.outputs) || isValidActionOutput(data.outputs.m1)) &&
+             (!('m2' in data.outputs) || isValidActionOutput(data.outputs.m2)) &&
+             (!('m3' in data.outputs) || isValidActionOutput(data.outputs.m3)) &&
+             (!('m4' in data.outputs) || isValidActionOutput(data.outputs.m4)) &&
+             (!('m5' in data.outputs) || isValidActionOutput(data.outputs.m5)) &&
+             (!('m6' in data.outputs) || isValidActionOutput(data.outputs.m6)) &&
+             exists(/databases/$(database)/documents/enrollments/$(cardId));
+    }
+
     function isValidForumPost(data) {
       return data.keys().hasAll(['courseId', 'userId', 'userName', 'content', 'createdAt']) &&
              data.courseId is string &&
@@ -139,6 +165,23 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
                       isValidCertificate(request.resource.data) &&
                       request.resource.data.userId == request.auth.uid;
+    }
+
+    // Private learner work. Only the owner can read or write it (instructors and admins use server tools, not rules).
+    // resource == null lets the owner's first read of a not-yet-created card return "empty" instead of an error;
+    // it reveals nothing because a missing document has no content.
+    match /actionCards/{cardId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if false;
+
+      allow create: if isAuthenticated() && isValidActionCard(request.resource.data, cardId);
+
+      allow update: if isAuthenticated() &&
+                      resource.data.userId == request.auth.uid &&
+                      isValidActionCard(request.resource.data, cardId) &&
+                      request.resource.data.courseId == resource.data.courseId;
+
+      allow delete: if false;
     }
 
     match /forumPosts/{postId} {

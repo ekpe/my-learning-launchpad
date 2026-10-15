@@ -13,7 +13,10 @@
     "vercel-build": "vite build && node scripts/prerender-webinar.mjs",
     "dev:server": "tsx server.ts",
     "test": "node scripts/run-tests.mjs",
-    "webinar:local": "node scripts/webinar-local.mjs"
+    "webinar:local": "node scripts/webinar-local.mjs",
+    "migration:dry-run": "tsx scripts/flagship-migration-dry-run.mts",
+    "e2e:api": "tsx tests/helpers/e2e-server.ts",
+    "e2e:web": "vite --config tests/e2e-fake/vite.config.mts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
@@ -27,6 +30,7 @@
     "express": "^4.21.2",
     "firebase": "^12.11.0",
     "firebase-admin": "^12.7.0",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "multer": "^2.1.1",
