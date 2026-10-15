@@ -42,6 +42,7 @@ import { courseDuration } from '../lib/courseDuration';
 import { WebinarAdmin } from './admin/WebinarAdmin';
 import { CurriculumEditor } from './admin/CurriculumEditor';
 import { LaunchReadiness } from './admin/LaunchReadiness';
+import { CourseDetailsEditor } from './admin/CourseDetailsEditor';
 import { UserProfile, Enrollment, Course } from '../types';
 
 import { 
@@ -89,6 +90,7 @@ export const AdminDashboard: React.FC = () => {
   const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [showCourseForm, setShowCourseForm] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [editingDetails, setEditingDetails] = useState<Course | null>(null);
   const [showUserForm, setShowUserForm] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -691,7 +693,20 @@ export const AdminDashboard: React.FC = () => {
 
         {/* Content */}
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-          {editingCourse ? (
+          {editingDetails ? (
+            <CourseDetailsEditor
+              key={editingDetails.id}
+              course={editingDetails}
+              gated={isGated(editingDetails.id)}
+              adminFetch={adminFetch}
+              onUpload={handleFileUpload}
+              onCancel={() => setEditingDetails(null)}
+              onSaved={(message) => {
+                setStatus({ type: 'success', message });
+                setEditingDetails(null);
+              }}
+            />
+          ) : editingCourse ? (
              <CurriculumEditor
                key={editingCourse.id}
                course={editingCourse}
@@ -1046,6 +1061,14 @@ export const AdminDashboard: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setEditingDetails(course)}
+                            className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                            title="Edit course page (card and overview)"
+                            aria-label={`Edit course page: ${course.title}`}
+                          >
+                            <FileText className="w-4 h-4" />
+                          </button>
                           <button 
                             onClick={() => setEditingCourse(course)}
                             className="p-2 text-slate-400 hover:text-blue-600 transition-colors"

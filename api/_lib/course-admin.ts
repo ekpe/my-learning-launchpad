@@ -17,6 +17,7 @@ import {
   V1_TO_V2,
   remapCompletedLessons,
 } from "./flagship-migration.js";
+import { detailsFromCourse, validateCourseDetails } from "./course-details.js";
 import {
   MIGRATION_CONFIRM_TOKEN,
   PUBLISH_CONFIRM_TOKEN,
@@ -170,6 +171,69 @@ export async function saveDraftCurriculum(db: Db, body: any, stamp: Stamp): Prom
   if (plannedDuration && typeof plannedDuration === "object") course.plannedDuration = cleanJson(plannedDuration);
   await ref.set({ ...snap.data(), course, updatedAt: stamp(), source: "admin-editor" });
   return { status: 200, body: { ok: true } };
+}
+
+// ── course details (landing-page content) ────────────────────────────────────
+
+/**
+ * Edits the content shown on the course card and course page. Only the fields in course-details.ts are accepted
+ * (anything else is rejected), so this can never alter curriculum, pricing, access or learner records.
+ *  - target "live": takes effect for visitors immediately, no redeploy. The previous values of the fields that
+ *    changed are kept in courseArchive so an edit can be undone. If the live course is a published launch-gated
+ *    course, the draft is updated too so a later publish cannot silently undo the edit.
+ *  - target "draft": for a launch-gated course that is not published yet; visitors see it only after publish.
+ */
+export async function saveCourseDetails(
+  db: Db,
+  body: { courseId?: string; target?: string; fields?: unknown },
+  stamp: Stamp,
+  opts: { now?: () => Date } = {},
+): Promise<OpResult> {
+  const courseId = body?.courseId;
+  if (!courseId || typeof courseId !== "string") return { status: 400, body: { error: "courseId is required" } };
+  const target = body.target ?? "live";
+  if (target !== "live" && target !== "draft") return { status: 400, body: { error: 'target must be "live" or "draft"' } };
+
+  const v = validateCourseDetails(body.fields);
+  if (!v.ok) return { status: 400, body: { error: "Some fields need attention.", errors: v.errors } };
+  const now = opts.now ?? (() => new Date());
+
+  if (target === "draft") {
+    const ref = db.collection(DRAFTS).doc(courseId);
+    const snap = await ref.get();
+    if (!snap.exists) return { status: 404, body: { error: "No draft exists yet. Run Sync Static Data first." } };
+    const d = snap.data();
+    // Compare with what the form would have shown (unset == empty; outcomes fall back to learningObjectives).
+    const shown = detailsFromCourse(d.course) as any;
+    const changed = Object.keys(v.fields).filter((k) => !sameJson(shown[k], (v.fields as any)[k]));
+    await ref.set({ ...d, course: { ...d.course, ...v.fields }, updatedAt: stamp(), source: "admin-details" });
+    return { status: 200, body: { ok: true, target, changed } };
+  }
+
+  const ref = db.collection("courses").doc(courseId);
+  const snap = await ref.get();
+  if (!snap.exists) return { status: 404, body: { error: "Course not found" } };
+  const live = snap.data();
+  const shown = detailsFromCourse(live) as any;
+  const changed = Object.keys(v.fields).filter((k) => !sameJson(shown[k], (v.fields as any)[k]));
+  if (changed.length === 0) return { status: 200, body: { ok: true, target, changed: [], archived: null } };
+
+  const previous: Record<string, unknown> = {};
+  for (const k of changed) previous[k] = live[k] ?? null;
+  const archivedId = `${courseId}__${now().toISOString().replace(/[:.]/g, "-")}__details`;
+  await db.collection(ARCHIVE).doc(archivedId).set({ courseId, archivedAt: stamp(), reason: "pre-details-edit", previous });
+
+  await ref.set({ ...v.fields, updatedAt: stamp() }, { merge: true });
+
+  if (live.launchGate === true) {
+    const dref = db.collection(DRAFTS).doc(courseId);
+    const dsnap = await dref.get();
+    if (dsnap.exists) {
+      const d = dsnap.data();
+      await dref.set({ ...d, course: { ...d.course, ...v.fields }, updatedAt: stamp(), source: "admin-details" });
+    }
+  }
+  return { status: 200, body: { ok: true, target, changed, archived: archivedId } };
 }
 
 // ── readiness ────────────────────────────────────────────────────────────────
@@ -436,6 +500,7 @@ export async function handleCourseAdminOp(
   const q = req.query ?? {};
   if (method === "GET" && resource === "course-draft-get") return getDraft(db, String(q.courseId ?? ""));
   if (method === "GET" && resource === "course-readiness") return courseReadiness(db, { courseId: q.courseId && String(q.courseId), verify: q.verify && String(q.verify) }, deps.fetch);
+  if (method === "POST" && resource === "course-details-save") return saveCourseDetails(db, req.body, stamp, { now: deps.now });
   if (method === "POST" && resource === "course-draft-save") return saveDraftCurriculum(db, req.body, stamp);
   if (method === "POST" && resource === "course-publish") return publishCourse(db, req.body, stamp, { now: deps.now });
   if (method === "POST" && resource === "course-migrate-progress") return migrateFlagshipProgress(db, req.body ?? {}, stamp);

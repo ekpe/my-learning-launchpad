@@ -180,7 +180,8 @@ export const CourseDetail = () => {
   const duration = courseDuration(course);
   const showPlanned = duration.complete && duration.totalMinutes > 0;
   const paragraphs = (course.fullDescription || course.description).split(/\n{2,}/);
-  const outcomes = course.outcomes ?? course.learningObjectives;
+  // An emptied list falls back to the next source instead of rendering a heading with nothing under it.
+  const outcomes = course.outcomes?.length ? course.outcomes : course.learningObjectives?.length ? course.learningObjectives : undefined;
   const nextSteps = (course.nextStepCourseIds ?? [])
     .map((cid) => courses.find((c) => c.id === cid))
     .filter((c): c is Course => !!c);
@@ -476,9 +477,9 @@ export const CourseDetail = () => {
               </div>
               
               <div className="p-8 bg-slate-50 rounded-3xl border border-slate-100">
-                <h4 className="font-bold text-slate-900 mb-4">{course.benefits ? 'What You Get' : 'Course Features'}</h4>
+                <h4 className="font-bold text-slate-900 mb-4">{course.benefits?.length ? 'What You Get' : 'Course Features'}</h4>
                 <ul className="space-y-4">
-                  {(course.benefits ?? [
+                  {(course.benefits?.length ? course.benefits : [
                     'Lifetime access',
                     'Mobile compatible',
                     'Certificate of completion',
