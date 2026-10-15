@@ -122,6 +122,15 @@ The dry run reports: enrollments, completed, partial, not started, unmappable pr
 8. Smoke test with a real test account: enroll, complete a lesson, save the Action Card on two devices, download the PDF; check three existing learners' dashboards.
 9. **Rollback:** Revert migration (restores every learner it moved). To restore the old live curriculum, copy `courseArchive/<id>.course` (or `docs/archive/ai-strategy-leaders.live-firestore-2026-10-14.json`) back into `courses/ai-strategy-leaders` in the Firebase console. There is no button for that second step.
 
+## 9. Follow-up: edit course page content without a redeploy
+
+Admin > Courses > the page icon on a course opens **Edit course page**: title, subtitle, track label, card and short descriptions, full description, duration, format, audience, image (URL or upload), learning outcomes and benefits, with a live card preview. Saves go through the admin API straight to the database, so the card and course page change for visitors immediately.
+
+- Only these fields can be edited there. Curriculum, price, free flag, order, launch gate and learner data are rejected by the server.
+- Each live edit stores the previous values in `courseArchive` (`pre-details-edit`), so it can be undone.
+- Launch-gated course that is not yet published: choose **Live page** (what visitors see now) or **Draft** (the new version). Once published, one save updates both so a later publish cannot undo it.
+- Not included: the home-page hero, About and testimonials, which are still in code.
+
 ---
 
 ## Appendix A. Curriculum migration map (v1 to v2)
