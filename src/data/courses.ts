@@ -66,7 +66,7 @@ export const courses: Course[] = [
           { id: "m1-l1", title: "Lesson 1.1 — Why This AI Moment Is Different", kind: "lesson", plannedMinutes: 4, description: "Introduces the shift from traditional predictive AI to generative and increasingly agentic systems, and why that shift matters for leadership decisions rather than technical history.", videoUrl: "" },
           { id: "m1-l2", title: "Lesson 1.2 — The AI Capability Ladder™", kind: "lesson", plannedMinutes: 4, description: "Predict → Generate → Assist → Act → Collaborate → Orchestrate. As capability rises, the questions leaders must ask change. Technical capability is never automatic permission to act.", videoUrl: "" },
           { id: "m1-l3", title: "Lesson 1.3 — What AI Can—and Cannot—Do", kind: "lesson", plannedMinutes: 4, description: "Separates Capability → Reliability → Authority, and explains why human judgment and accountability remain important.", videoUrl: "" },
-          { id: "m1-a", title: "Activity — My AI Leadership Starting Point", kind: "activity", plannedMinutes: 3, description: "Choose one real workflow or challenge in your organization and identify one AI capability that could help.", output: "Action Card Output 1: My chosen workflow and the AI capability that could improve it." }
+          { id: "m1-a", title: "Activity — My AI Leadership Starting Point", kind: "activity", plannedMinutes: 3, description: "Choose one real workflow or challenge in your organization and identify one AI capability that could improve it, and type both in the box below.", output: "Action Card Output 1: My chosen workflow and the AI capability that could improve it." }
         ]
       },
       {
