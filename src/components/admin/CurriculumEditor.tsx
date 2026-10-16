@@ -3,6 +3,7 @@ import { CheckCircle, Loader2, FileText, Video, Upload, GripVertical, Plus, Tras
 import { Button } from '../ui/Button';
 import { courseDuration } from '../../lib/courseDuration';
 import { assessTopic } from '../../../api/_lib/course-publication';
+import { VIDEO_HELP } from '../../lib/uploadLimits';
 import type { Course } from '../../types';
 
 export interface CurriculumEditorProps {
@@ -12,7 +13,8 @@ export interface CurriculumEditorProps {
   busy: boolean;
   isUploading: boolean;
   onCancel: () => void;
-  onUpload: (file: File) => Promise<string | undefined>;
+  /** Resolves with the file's URL, or throws an Error whose message is shown next to the field. */
+  onUpload: (file: File) => Promise<string>;
   onSave: (curriculum: any[]) => Promise<void>;
   /** Gated only: returns the draft curriculum, or null when no draft exists yet. */
   loadDraft?: () => Promise<any[] | null>;
@@ -31,6 +33,21 @@ const STATE_STYLE: Record<string, string> = {
  */
 export const CurriculumEditor = ({ course, gated, busy, isUploading, onCancel, onUpload, onSave, loadDraft }: CurriculumEditorProps) => {
     const [localCurriculum, setLocalCurriculum] = useState<any[]>(course.curriculum || []);
+    // Upload problems are shown beside the field they belong to (a banner at the top of the page is easy to miss).
+    const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
+    const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+    const runUpload = async (key: string, file: File, apply: (url: string) => void) => {
+      setUploadErrors((e) => ({ ...e, [key]: '' }));
+      setUploadingKey(key);
+      try {
+        apply(await onUpload(file));
+      } catch (err: any) {
+        setUploadErrors((e) => ({ ...e, [key]: err?.message || 'Upload failed.' }));
+      } finally {
+        setUploadingKey(null);
+      }
+    };
+
     const [draftState, setDraftState] = useState<'ready' | 'loading' | 'missing' | 'error'>(gated ? 'loading' : 'ready');
 
     useEffect(() => {
@@ -293,22 +310,25 @@ export const CurriculumEditor = ({ course, gated, busy, isUploading, onCancel, o
                                 className="hidden"
                                 accept="video/*"
                                 onChange={async (e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    const url = await onUpload(file);
-                                    if (url) updateLesson(mIdx, lIdx, { videoUrl: url });
-                                  }
+                                  const input = e.target;
+                                  const file = input.files?.[0];
+                                  input.value = ''; // lets the same file be chosen again after a failure
+                                  if (file) await runUpload(`video-${mIdx}-${lIdx}`, file, (url) => updateLesson(mIdx, lIdx, { videoUrl: url }));
                                 }}
                               />
                               <label
                                 htmlFor={`video-${mIdx}-${lIdx}`}
                                 className="p-2 bg-blue-50 text-blue-900 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors flex items-center justify-center"
-                                title="Upload Video"
+                                title="Upload a small file (videos: paste a link instead)"
                               >
-                                {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                                {uploadingKey === `video-${mIdx}-${lIdx}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                               </label>
                             </div>
                           </div>
+                          <p className="text-xs text-slate-600">{VIDEO_HELP}</p>
+                          {uploadErrors[`video-${mIdx}-${lIdx}`] && (
+                            <p className="rounded-lg bg-red-50 p-2 text-xs font-semibold text-red-900" role="alert" data-testid={`upload-error-video-${mIdx}-${lIdx}`}>{uploadErrors[`video-${mIdx}-${lIdx}`]}</p>
+                          )}
                         </div>
 
                         <div className="space-y-2">
@@ -330,11 +350,10 @@ export const CurriculumEditor = ({ course, gated, busy, isUploading, onCancel, o
                                 id={`material-${mIdx}-${lIdx}`}
                                 className="hidden"
                                 onChange={async (e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    const url = await onUpload(file);
-                                    if (url) updateLesson(mIdx, lIdx, { materialUrl: url });
-                                  }
+                                  const input = e.target;
+                                  const file = input.files?.[0];
+                                  input.value = '';
+                                  if (file) await runUpload(`material-${mIdx}-${lIdx}`, file, (url) => updateLesson(mIdx, lIdx, { materialUrl: url }));
                                 }}
                               />
                               <label
@@ -342,10 +361,13 @@ export const CurriculumEditor = ({ course, gated, busy, isUploading, onCancel, o
                                 className="p-2 bg-blue-50 text-blue-900 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors flex items-center justify-center"
                                 title="Upload Material"
                               >
-                                {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                                {uploadingKey === `material-${mIdx}-${lIdx}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                               </label>
                             </div>
                           </div>
+                          {uploadErrors[`material-${mIdx}-${lIdx}`] && (
+                            <p className="rounded-lg bg-red-50 p-2 text-xs font-semibold text-red-900" role="alert">{uploadErrors[`material-${mIdx}-${lIdx}`]}</p>
+                          )}
                         </div>
                       </div>
                     </div>

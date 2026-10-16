@@ -17,7 +17,7 @@ interface Props {
   /** Launch-gated course (its changes normally flow through a draft). */
   gated: boolean;
   adminFetch: AdminFetch;
-  onUpload: (file: File) => Promise<string | undefined>;
+  onUpload: (file: File) => Promise<string>;
   onCancel: () => void;
   onSaved: (message: string) => void;
 }
@@ -211,11 +211,14 @@ export const CourseDetailsEditor = ({ course, gated, adminFetch, onUpload, onCan
                       const file = e.target.files?.[0];
                       if (!file) return;
                       setUploading(true);
+                      setServerErrors((er) => ({ ...er, image: '' }));
                       try {
-                        const url = await onUpload(file);
-                        if (url) set('image', url);
+                        set('image', await onUpload(file));
+                      } catch (err: any) {
+                        setServerErrors((er) => ({ ...er, image: err?.message || 'Upload failed.' }));
                       } finally {
                         setUploading(false);
+                        e.target.value = '';
                       }
                     }}
                   />

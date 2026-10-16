@@ -255,6 +255,8 @@ app.all("/api/admin", async (req, res) => {
   const resource = String(req.query.resource ?? "");
   const stampFn = () => ({ isEqual: () => false }); // the fake db turns this into a server timestamp
   try {
+    // Vercel rejects request bodies over ~4.5 MB before the function runs (plain-text error, not JSON).
+    if (resource === "upload" && Number(req.headers["content-length"] ?? 0) > 4_500_000) return res.status(413).type("text").send("FUNCTION_PAYLOAD_TOO_LARGE");
     if (resource === "upload") return send(res, 200, { url: `https://media.e2e-test.example.com/uploads/${Date.now()}.mp4`, filename: "upload.mp4" });
     if (req.method === "POST" && resource === "sync-courses") {
       const r = await syncCourseList(db, req.body.courses, stampFn, { confirmMediaReplacement: req.body.confirmMediaReplacement });

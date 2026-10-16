@@ -39,6 +39,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Button } from './ui/Button';
 import { courses as staticCourses } from '../data/courses';
 import { courseDuration } from '../lib/courseDuration';
+import { uploadFailureMessage, uploadSizeProblem } from '../lib/uploadLimits';
 import { WebinarAdmin } from './admin/WebinarAdmin';
 import { CurriculumEditor } from './admin/CurriculumEditor';
 import { LaunchReadiness } from './admin/LaunchReadiness';
@@ -312,9 +313,12 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleFileUpload = async (file: File) => {
+  /** Uploads a small file and returns its URL. Throws an Error with a message fit to show next to the field. */
+  const handleFileUpload = async (file: File): Promise<string> => {
+    const tooBig = uploadSizeProblem(file.size, file.name);
+    if (tooBig) throw new Error(tooBig);
+
     setIsUploading(true);
-    setStatus(null);
     try {
       const idToken = await auth.currentUser?.getIdToken();
       const formData = new FormData();
@@ -322,22 +326,26 @@ export const AdminDashboard: React.FC = () => {
 
       const response = await fetch('/api/admin?resource=upload', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${idToken}`
-        },
+        headers: { 'Authorization': `Bearer ${idToken}` },
         body: formData
       });
 
       if (!response.ok) {
-        throw new Error('Failed to upload file');
+        let serverMessage: string | undefined;
+        try {
+          serverMessage = (await response.json())?.error;
+        } catch {
+          /* not JSON (for example the platform's own 413 page) */
+        }
+        throw new Error(uploadFailureMessage(response.status, serverMessage));
       }
 
       const data = await safeJson(response);
+      if (!data.url) throw new Error('The server did not return a link for the uploaded file.');
       return data.url;
     } catch (error: any) {
       console.error('Upload error:', error);
-      setStatus({ type: 'error', message: 'Failed to upload file.' });
-      return null;
+      throw error instanceof Error && error.message ? error : new Error('Upload failed. Check your connection and try again.');
     } finally {
       setIsUploading(false);
     }
