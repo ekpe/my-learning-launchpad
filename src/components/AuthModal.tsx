@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import {
   signInWithEmailAndPassword,
@@ -16,6 +17,12 @@ import { motion, AnimatePresence } from 'motion/react';
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Which form to show when the dialog opens. Registration pages open in 'signup'. Default 'login'. */
+  initialMode?: 'login' | 'signup';
+  /** Optional wording for the registration form (for example "Register for the free course"). */
+  signupTitle?: string;
+  signupSubtitle?: string;
+  signupSubmitLabel?: string;
 }
 
 // Map Firebase error codes to human-friendly messages
@@ -42,8 +49,13 @@ function friendlyError(code: string): string {
   }
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const [isLogin, setIsLogin] = useState(true);
+export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'login', signupTitle, signupSubtitle, signupSubmitLabel }) => {
+  const [isLogin, setIsLogin] = useState(initialMode !== 'signup');
+
+  // Each time the dialog opens, start on the form the caller asked for.
+  useEffect(() => {
+    if (isOpen) setIsLogin(initialMode !== 'signup');
+  }, [isOpen, initialMode]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -166,12 +178,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             <div className="p-8 md:p-10">
               <div className="text-center mb-8">
                 <h2 className="text-2xl font-bold text-slate-900 mb-2">
-                  {isLogin ? 'Welcome Back' : 'Create Account'}
+                  {isLogin ? 'Welcome Back' : signupTitle ?? 'Create Account'}
                 </h2>
                 <p className="text-slate-500 text-sm">
                   {isLogin
                     ? 'Sign in to access your AI learning dashboard'
-                    : 'Join My Learning Launchpad to start your AI journey'}
+                    : signupSubtitle ?? 'Join My Learning Launchpad to start your AI journey'}
                 </p>
               </div>
 
@@ -262,10 +274,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     {loading ? (
                       <Loader2 className="w-6 h-6 animate-spin" />
                     ) : (
-                      isLogin ? 'Sign In' : 'Create Account'
+                      isLogin ? 'Sign In' : signupSubmitLabel ?? 'Create Account'
                     )}
                   </Button>
                 </form>
+                {!isLogin && (
+                  <p className="text-center text-xs text-slate-500">
+                    By creating an account you agree to our{' '}
+                    <Link to="/privacy" onClick={handleClose} className="font-semibold text-blue-900 underline">Privacy &amp; Cookie Policy</Link>.
+                  </p>
+                )}
               </div>
 
               <div className="mt-8 text-center text-sm text-slate-500">

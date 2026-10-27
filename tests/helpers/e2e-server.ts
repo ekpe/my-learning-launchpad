@@ -49,6 +49,8 @@ function seed(scenario: string) {
   db = createFakeDb();
   versions.clear();
   mail.length = 0;
+  // A public webinar (open, five days out) so the site-wide announcement can be exercised.
+  db.seed("webinars", "leading-ai-hype-to-strategy", { title: "Leading in the Age of AI: From Hype to Strategy", subtitle: "Harness sample", startsAt: new Date(Date.now() + 5 * 86_400_000).toISOString(), timezone: "America/New_York", durationMinutes: 60, registrationStatus: "open", webinarStatus: "scheduled" });
   for (const [uid, a] of Object.entries(ACCOUNTS)) db.seed("users", uid, { uid, email: a.email, displayName: a.displayName, role: a.role, createdAt: ts() });
 
   if (scenario === "published") {
@@ -137,6 +139,7 @@ function allowed(op: Op, col: string, id: string, uid: string | null, existing: 
       if (op === "create") return valid;
       return valid && existing?.userId === uid && existing?.courseId === next.courseId;
     }
+    case "webinars": return op === "get" || op === "list";
     case "analytics": case "leads": return op === "create";
     case "forumPosts": return op === "get" || op === "list" ? !!uid : op === "create" && !!uid;
     default: return false;

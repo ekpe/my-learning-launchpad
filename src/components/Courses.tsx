@@ -69,7 +69,7 @@ const CourseCard: React.FC<CourseCardProps> = ({ id, title, description, duratio
         
         <Link to={`/course/${id}`} className="mt-auto">
           <Button variant="outline" className={`${featured ? 'w-auto px-8' : 'w-full'} group`}>
-            {isFree ? 'Enroll Now' : 'View Details'}
+            {isFree ? 'Register for Free' : 'View Details'}
             <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Button>
         </Link>

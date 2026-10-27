@@ -1,19 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from './ui/Button';
-import { Menu, X, Rocket, User as UserIcon, LogOut } from 'lucide-react';
+import { Menu, X, Rocket, User as UserIcon, LogOut, ArrowRight } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { AuthModal } from './AuthModal';
+import { useWebinarConfig } from '../hooks/useWebinarConfig';
+import { ANNOUNCEMENT_HREF, NAV_HREF, announcementFor, showsAnnouncementOn } from '../lib/webinarAnnouncement';
+
+const DISMISS_KEY = 'mll_webinar_bar_dismissed';
+const wasDismissed = () => {
+  try {
+    return sessionStorage.getItem(DISMISS_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
 
 export const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const { user, profile } = useAuth();
-  const onDarkHero = useLocation().pathname === '/webinar';
+  const { pathname } = useLocation();
+  const onDarkHero = pathname === '/webinar';
+
+  // Announce the webinar only while it is real (see webinarAnnouncement.ts). Dismissal lasts for this tab session.
+  const webinar = useWebinarConfig();
+  const announcement = announcementFor(webinar.config);
+  const [barDismissed, setBarDismissed] = useState(wasDismissed);
+  const barVisible = !!announcement && !barDismissed && showsAnnouncementOn(pathname);
+  const dismissBar = () => {
+    setBarDismissed(true);
+    try {
+      sessionStorage.setItem(DISMISS_KEY, '1');
+    } catch {
+      /* private mode: the bar simply reappears next visit */
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -31,18 +57,47 @@ export const Navbar = () => {
     }
   };
 
-  const navLinks = [
+  const navLinks: { name: string; href: string; highlight?: boolean }[] = [
     { name: 'Home', href: '/' },
     { name: 'Courses', href: '/#courses' },
+    ...(announcement ? [{ name: 'Free Webinar', href: NAV_HREF, highlight: true }] : []),
     { name: 'About', href: '/#about' },
     { name: 'Contact', href: '/#contact' },
   ];
 
   return (
     <>
+      {barVisible && announcement && (
+        <div
+          className="fixed top-0 left-0 right-0 z-[60] flex h-9 items-center justify-center gap-3 bg-navy-900 px-10 text-xs text-white sm:text-sm"
+          role="region"
+          aria-label="Webinar announcement"
+          data-testid="webinar-announcement"
+        >
+          <Link to={ANNOUNCEMENT_HREF} className="flex min-w-0 items-center gap-2 font-medium hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+            <span className="shrink-0 rounded bg-gold-500 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-navy-950">Free webinar</span>
+            <span className="min-w-0 truncate">
+              {announcement.mode === 'open' ? announcement.when : 'Date coming soon'}
+              <span className="hidden md:inline"> · {announcement.title}</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1 font-bold text-gold-400">
+              {announcement.mode === 'open' ? 'Register free' : 'Join the waitlist'} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </span>
+          </Link>
+          <button
+            type="button"
+            onClick={dismissBar}
+            aria-label="Dismiss webinar announcement"
+            className="absolute right-3 rounded p-1 text-slate-300 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+      )}
       <nav
         className={cn(
-          'fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-6 py-4',
+          'fixed left-0 right-0 z-50 transition-all duration-300 px-6 py-4',
+          barVisible ? 'top-9' : 'top-0',
           isScrolled || onDarkHero ? 'bg-cream/95 backdrop-blur-md shadow-sm py-3' : 'bg-transparent'
         )}
       >
@@ -68,7 +123,7 @@ export const Navbar = () => {
               <Link
                 key={link.name}
                 to={link.href}
-                className="text-sm font-medium text-slate-600 hover:text-blue-900 transition-colors"
+                className={cn('text-sm font-medium transition-colors', link.highlight ? 'font-bold text-amber-700 hover:text-amber-800' : 'text-slate-600 hover:text-blue-900')}
               >
                 {link.name}
               </Link>
@@ -147,7 +202,7 @@ export const Navbar = () => {
               <Link
                 key={link.name}
                 to={link.href}
-                className="text-base font-medium text-slate-600"
+                className={cn('text-base font-medium', link.highlight ? 'font-bold text-amber-700' : 'text-slate-600')}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
                 {link.name}

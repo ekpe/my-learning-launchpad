@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { courses } from '../data/courses';
 import { Button } from './ui/Button';
 import { Clock, Users, ArrowLeft, ArrowRight, CheckCircle2, ClipboardList, Loader2, PlayCircle, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
-import { doc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { sendEmail } from '../services/emailService';
 import { AuthModal } from './AuthModal';
 import { DiscussionForum } from './DiscussionForum';
 import { Course, Enrollment } from '../types';
-import { resolveTrack } from '../lib/courseProgress';
+import { nextRequiredKey, resolveTrack } from '../lib/courseProgress';
 import { resolveCourse } from '../hooks/useLiveCourses';
 import { logEvent, AnalyticsEvent } from '../services/analyticsService';
 import { courseDuration, moduleDuration } from '../lib/courseDuration';
@@ -19,6 +19,9 @@ import { courseDuration, moduleDuration } from '../lib/courseDuration';
 export const CourseDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  // Set when a signed-out visitor presses "Register for Free": once they have an account we finish the enrolment for them.
+  const pendingEnrollAt = React.useRef<number | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [isEnrolling, setIsEnrolling] = useState(false);
@@ -52,6 +55,7 @@ export const CourseDetail = () => {
     }
 
     const enrollmentId = `${user.uid}_${id}`;
+    setIsLoadingEnrollment(true);
     const unsubscribe = onSnapshot(doc(db, 'enrollments', enrollmentId), (docSnap) => {
       if (docSnap.exists()) {
         setEnrollment(docSnap.data() as Enrollment);
@@ -69,6 +73,7 @@ export const CourseDetail = () => {
 
   const handleEnroll = async () => {
     if (!user) {
+      pendingEnrollAt.current = Date.now();
       setIsAuthModalOpen(true);
       return;
     }
@@ -101,6 +106,18 @@ export const CourseDetail = () => {
       }
 
       const enrollmentId = `${user.uid}_${id}`;
+
+      // Never overwrite an enrolment that already exists (that would reset the learner's progress).
+      // The rules refuse to read a missing enrolment, so a denied read just means "not enrolled yet".
+      try {
+        if ((await getDoc(doc(db, 'enrollments', enrollmentId))).exists()) {
+          navigate(`/course/${id}/lesson/0/0`);
+          return;
+        }
+      } catch {
+        /* not enrolled yet */
+      }
+
       await setDoc(doc(db, 'enrollments', enrollmentId), {
         userId: user.uid,
         courseId: id,
@@ -138,6 +155,7 @@ export const CourseDetail = () => {
           `
         });
       }
+      navigate(`/course/${id}/lesson/0/0`);
     } catch (error) {
       console.error("Enrollment error:", error);
       alert("Failed to enroll. Please try again.");
@@ -145,6 +163,17 @@ export const CourseDetail = () => {
       setIsEnrolling(false);
     }
   };
+
+  // Registration finished (or the visitor signed in): complete the enrolment they asked for, once, and only for a
+  // free course they are not already enrolled in. Expires after two minutes so a stale click never enrols anyone later.
+  useEffect(() => {
+    const at = pendingEnrollAt.current;
+    if (!at || !user || isLoadingEnrollment || !course) return;
+    pendingEnrollAt.current = null;
+    if (Date.now() - at > 120_000 || enrollment || !course.isFree) return;
+    void handleEnroll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isLoadingEnrollment, enrollment, course]);
 
   if (isLoadingCourse) {
     return (
@@ -314,11 +343,22 @@ export const CourseDetail = () => {
                         </div>
                       </div>
                     ) : enrolled ? (
-                      <Link to="/dashboard">
-                        <Button size="lg" className="rounded-full px-10 font-bold bg-green-600 hover:bg-green-700">
-                          Go to Dashboard
-                        </Button>
-                      </Link>
+                      <>
+                        {(() => {
+                          const next = nextRequiredKey(course, track.completedLessons);
+                          const [m, l] = (next ?? '0_0').split('_');
+                          return (
+                            <Link to={`/course/${course.id}/lesson/${m}/${l}`}>
+                              <Button size="lg" className="rounded-full px-10 font-bold bg-green-600 hover:bg-green-700">
+                                {track.completedLessons.length > 0 ? 'Continue learning' : 'Start learning'}
+                              </Button>
+                            </Link>
+                          );
+                        })()}
+                        <Link to="/dashboard">
+                          <Button size="lg" variant="outline" className="rounded-full px-10">Go to Dashboard</Button>
+                        </Link>
+                      </>
                     ) : (
                       <Button 
                         size="lg" 
@@ -329,7 +369,7 @@ export const CourseDetail = () => {
                         {isEnrolling ? (
                           <Loader2 className="w-5 h-5 animate-spin mr-2" />
                         ) : null}
-                        {course.isFree ? 'Enroll for Free' : 'Enroll Now'}
+                        {course.isFree ? 'Register for Free' : 'Enroll Now'}
                       </Button>
                     )}
                     {!isV2 && (
@@ -498,9 +538,13 @@ export const CourseDetail = () => {
         </div>
       </div>
 
-      <AuthModal 
-        isOpen={isAuthModalOpen} 
-        onClose={() => setIsAuthModalOpen(false)} 
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        initialMode={course.isFree ? 'signup' : 'login'}
+        signupTitle={course.isFree ? 'Register for the free course' : undefined}
+        signupSubtitle={course.isFree ? `Create your free account to start ${course.title}. It saves your progress and your Action Card.` : undefined}
+        signupSubmitLabel={course.isFree ? 'Register and start the course' : undefined}
       />
     </div>
   );
