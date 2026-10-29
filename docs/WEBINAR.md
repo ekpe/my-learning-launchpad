@@ -97,6 +97,11 @@ only), replay URL and the “replay confirmed” flag. Course CTA targets are th
 | – | Updated details (date/link changed) | Manual | Registrants and waitlist |
 | 5 | Thank-you (+ replay, key takeaways you type in) | Manual. The course invitation is included **only for opted-in** recipients | All registrants |
 | 6 | Learning pathways (free flagship + paid programs, **no prices**) | Manual, **promotional**: opted-in only, with unsubscribe link | Opted-in |
+| 7 | **Your own message** (subject, text, optional date/Join/worksheet block, optional button) | Manual: Admin → Webinars → Manual emails → "Write your own message". Has a **Send me a test** button and a recipient dry run. Each person gets a given message once (content-keyed, so an edited message is a new message). | Registered participants; optionally waitlist; or opted-in only (**promotional**, unsubscribe link added) |
+
+**Worksheet link** (Admin → Webinars → Private): optional. When set, an "Open the worksheet" button is added to the confirmation, both reminders,
+"What we'll cover", "Updated details" and any custom message that includes the details. It is stored privately like the Meet link. Reminders that
+were already queued don't change until you press **Reschedule reminders**.
 
 Rules the code enforces: marketing consent is never pre-checked and is stored with a timestamp and consent-text version;
 promotional mail goes only to opted-in people and always carries a signed unsubscribe link; sending requires an explicit

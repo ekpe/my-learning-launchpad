@@ -15,12 +15,29 @@
  */
 import express from "express";
 import { readFileSync } from "node:fs";
-import { createFakeDb } from "./fake-firestore.ts";
+import { createFakeDb, installResendMock } from "./fake-firestore.ts";
 
 process.env.FIREBASE_PROJECT_ID = "e2e-harness";
+// Webinar email: real handlers, mocked Resend (nothing is ever sent).
+process.env.RESEND_API_KEY = "re_harness";
+process.env.RESEND_FROM_EMAIL = "info@example.test";
+process.env.WEBINAR_TOKEN_SECRET = "harness-secret";
+process.env.WEBINAR_PACE_MS = "0";
+process.env.SITE_URL = "http://localhost:5176";
 
 const { handleCourseAdminOp, syncCourseList } = await import("../../api/_lib/course-admin.ts");
 const { courses } = await import("../../src/data/courses.ts");
+const webinarLib = await import("../../api/_lib/webinar.ts");
+const webinarAdmin = await import("../../api/_lib/webinar-admin.ts");
+const resendMock = installResendMock();
+const WEBINAR_OPS: Record<string, (b: any) => Promise<{ status: number; body: Record<string, unknown> }>> = {
+  "webinar-save": webinarAdmin.saveWebinar,
+  "webinar-reschedule": webinarAdmin.rescheduleReminders,
+  "webinar-broadcast": webinarAdmin.broadcast,
+  "webinar-custom": webinarAdmin.sendCustom,
+  "webinar-refresh-delivery": webinarAdmin.refreshDelivery,
+  "webinar-mark-attended": webinarAdmin.markAttended,
+};
 
 // ── accounts (local fake only) ───────────────────────────────────────────────
 const PASSWORD = "e2e-local-only-1";
@@ -47,10 +64,17 @@ const liveV1 = JSON.parse(readFileSync(new URL("../../docs/archive/ai-strategy-l
 
 function seed(scenario: string) {
   db = createFakeDb();
+  webinarLib.__setDbForTests(db);
+  resendMock.calls.length = 0;
   versions.clear();
   mail.length = 0;
   // A public webinar (open, five days out) so the site-wide announcement can be exercised.
   db.seed("webinars", "leading-ai-hype-to-strategy", { title: "Leading in the Age of AI: From Hype to Strategy", subtitle: "Harness sample", startsAt: new Date(Date.now() + 5 * 86_400_000).toISOString(), timezone: "America/New_York", durationMinutes: 60, registrationStatus: "open", webinarStatus: "scheduled" });
+  db.seed("webinarPrivate", "leading-ai-hype-to-strategy", { meetUrl: "https://meet.google.com/harness-link", worksheetUrl: "", replayUrl: "" });
+  // Three sample registrants (one opted in to marketing) and one waitlist sign-up.
+  const regs: [string, string, "registration" | "interest", boolean][] = [["Ada", "ada@e2e.test", "registration", true], ["Ben", "ben@e2e.test", "registration", false], ["Cy", "cy@e2e.test", "registration", false], ["Dee", "dee@e2e.test", "interest", false]];
+  regs.forEach(([firstName, email, type, marketingOptIn], i) =>
+    db.seed("webinarRegistrations", `reg${i}`, { eventId: "leading-ai-hype-to-strategy", firstName, lastName: "Sample", email, type, marketingOptIn, attended: false, delivery: {}, attribution: {}, createdAt: ts() }));
   for (const [uid, a] of Object.entries(ACCOUNTS)) db.seed("users", uid, { uid, email: a.email, displayName: a.displayName, role: a.role, createdAt: ts() });
 
   if (scenario === "published") {
@@ -260,6 +284,14 @@ app.all("/api/admin", async (req, res) => {
   try {
     // Vercel rejects request bodies over ~4.5 MB before the function runs (plain-text error, not JSON).
     if (resource === "upload" && Number(req.headers["content-length"] ?? 0) > 4_500_000) return res.status(413).type("text").send("FUNCTION_PAYLOAD_TOO_LARGE");
+    if (resource === "webinar-get" && req.method === "GET") {
+      const out = await webinarAdmin.getWebinar(req.query);
+      return send(res, out.status, out.body);
+    }
+    if (WEBINAR_OPS[resource] && req.method === "POST") {
+      const out = await WEBINAR_OPS[resource](req.body);
+      return send(res, out.status, out.body);
+    }
     if (resource === "upload") return send(res, 200, { url: `https://media.e2e-test.example.com/uploads/${Date.now()}.mp4`, filename: "upload.mp4" });
     if (req.method === "POST" && resource === "sync-courses") {
       const r = await syncCourseList(db, req.body.courses, stampFn, { confirmMediaReplacement: req.body.confirmMediaReplacement });
@@ -279,6 +311,9 @@ app.get("/api/config-check", (_req, res) => send(res, 200, { ok: true, checks: {
 app.post("/api/send-email", (req, res) => { mail.push({ to: req.body?.to, subject: req.body?.subject }); send(res, 200, { ok: true }); });
 
 app.post("/__reset", (req, res) => { seed(String(req.query.scenario ?? "prelaunch")); send(res, 200, { ok: true, scenario: req.query.scenario ?? "prelaunch" }); });
+app.get("/__debug/resend", (_req, res) =>
+  send(res, 200, resendMock.sends().map((m: any) => ({ to: m.body.to, subject: m.body.subject, scheduledAt: m.body.scheduled_at, hasWorksheet: /Open the worksheet/.test(m.body.html ?? ""), html: m.body.html })))
+);
 app.get("/__debug/mail", (_req, res) => send(res, 200, mail));
 app.get("/__debug/state", (req, res) => {
   const col = String(req.query.col ?? "");

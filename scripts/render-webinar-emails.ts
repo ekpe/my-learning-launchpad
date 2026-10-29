@@ -27,6 +27,7 @@ const event = {
   capacity: null,
   meetUrl: 'https://meet.google.com/sample-only-link', // SAMPLE ONLY
   replayUrl: 'https://example.com/sample-replay', // SAMPLE ONLY
+  worksheetUrl: 'https://example.com/sample-worksheet', // SAMPLE ONLY
 };
 
 const kinds: EmailKind[] = ['confirmation', 'preview', 'reminder24', 'reminder1', 'update', 'followup-thanks', 'followup-pathways'];

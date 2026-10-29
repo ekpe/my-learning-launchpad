@@ -87,6 +87,7 @@ export const WebinarAdmin = () => {
     agendaText: DEFAULT_AGENDA.map((a) => `${a.time} | ${a.title}`).join('\n'),
     meetUrl: '',
     replayUrl: '',
+    worksheetUrl: '',
     calendarEventId: '',
   });
   const [dirty, setDirty] = useState(false);
@@ -96,6 +97,15 @@ export const WebinarAdmin = () => {
   };
 
   const [template, setTemplate] = useState('followup-thanks');
+
+  // "Write your own message"
+  const [cSubject, setCSubject] = useState('');
+  const [cMessage, setCMessage] = useState('');
+  const [cDetails, setCDetails] = useState(false);
+  const [cBtnLabel, setCBtnLabel] = useState('');
+  const [cBtnUrl, setCBtnUrl] = useState('');
+  const [cAudience, setCAudience] = useState<'registrants' | 'registrants+waitlist' | 'promotional'>('registrants');
+  const [cTestTo, setCTestTo] = useState(auth.currentUser?.email ?? '');
   const [recap, setRecap] = useState('');
   const [attendedText, setAttendedText] = useState('');
   const [progress, setProgress] = useState<string>('');
@@ -123,6 +133,7 @@ export const WebinarAdmin = () => {
           agendaText: (p.agenda?.length ? p.agenda : DEFAULT_AGENDA).map((a: any) => `${a.time} | ${a.title}`).join('\n'),
           meetUrl: q.meetUrl ?? '',
           replayUrl: q.replayUrl ?? '',
+          worksheetUrl: q.worksheetUrl ?? '',
           calendarEventId: q.calendarEventId ?? '',
         });
         setDirty(false);
@@ -184,7 +195,7 @@ export const WebinarAdmin = () => {
             capacity: f.capacity ? Number(f.capacity) : null,
             agenda,
           },
-          private: { meetUrl: f.meetUrl, replayUrl: f.replayUrl, calendarEventId: f.calendarEventId },
+          private: { meetUrl: f.meetUrl, replayUrl: f.replayUrl, worksheetUrl: f.worksheetUrl, calendarEventId: f.calendarEventId },
         },
       });
       await load();
@@ -209,14 +220,46 @@ export const WebinarAdmin = () => {
       return `Checked delivery status for ${t.checked ?? 0} registrant(s).`;
     });
 
-  const broadcastPreview = () =>
+  const customBody = () => ({
+    eventId,
+    subject: cSubject,
+    message: cMessage,
+    includeDetails: cDetails,
+    buttonLabel: cBtnLabel,
+    buttonUrl: cBtnUrl,
+    audience: cAudience,
+  });
+
+  const customPreview = () =>
     run('preview', async () => {
+      const out = await api('webinar-custom', { method: 'POST', body: { ...customBody(), dryRun: true } });
+      return `Dry run: ${out.recipients} recipient(s), ${out.alreadySent} already received this exact message, ${out.toSend} would be sent${out.promotional ? ' (promotional: opted-in registrants only)' : ''}. Nothing was sent.`;
+    });
+
+  const customTest = () =>
+    run('test', async () => {
+      await api('webinar-custom', { method: 'POST', body: { ...customBody(), test: true, testTo: cTestTo } });
+      return `A test copy was sent to ${cTestTo.trim().toLowerCase()}. Check the layout and links, then send to everyone.`;
+    });
+
+  const customSend = () =>
+    run('send', async () => {
+      const preview = await api('webinar-custom', { method: 'POST', body: { ...customBody(), dryRun: true } });
+      if (!preview.toSend) return 'No eligible recipients to send to (everyone has already received this exact message, or nobody matches the audience).';
+      if (!window.confirm(`Send "${cSubject}" to ${preview.toSend} recipient(s) now? This sends real emails and cannot be undone.`)) return 'Cancelled. Nothing was sent.';
+      const t = await runBatches('webinar-custom', { ...customBody(), dryRun: false, confirm: true }, progressText);
+      await load();
+      return `Sent ${t.sent ?? 0}, failed ${t.failed ?? 0}, skipped ${t.skipped ?? 0}.`;
+    });
+
+  const broadcastPreview = () =>
+    template === 'custom' ? customPreview() : run('preview', async () => {
       const out = await api('webinar-broadcast', { method: 'POST', body: { eventId, template, dryRun: true } });
       return `Dry run: ${out.recipients} eligible recipient(s), ${out.alreadySent} already sent, ${out.toSend} would be sent${out.promotional ? ' (promotional: opted-in registrants only)' : ''}. Nothing was sent.`;
     });
 
   const broadcastSend = () =>
-    run('send', async () => {
+    template === 'custom' ? customSend() : run('send', async () => {
       const preview = await api('webinar-broadcast', { method: 'POST', body: { eventId, template, dryRun: true } });
       if (!preview.toSend) return 'No eligible recipients to send to.';
       if (!window.confirm(`Send "${template}" to ${preview.toSend} recipient(s) now? This sends real emails and cannot be undone.`)) return 'Cancelled. Nothing was sent.';
@@ -355,7 +398,16 @@ export const WebinarAdmin = () => {
           <div className="md:col-span-2">
             <label htmlFor="wa-meet" className={label}>Google Meet joining URL</label>
             <input id="wa-meet" className={field} placeholder="https://meet.google.com/abc-defg-hij" value={f.meetUrl} onChange={(e) => update({ meetUrl: e.target.value })} />
-            <p className="mt-1 text-xs text-slate-500">Only goes out in confirmation and reminder emails. Changing it doesn't update reminders already scheduled; use "Reschedule reminders" afterwards.</p>
+            <p className="mt-1 text-xs text-slate-500">Only goes out in emails. Changing it doesn't update reminders already scheduled; use "Reschedule reminders" afterwards.</p>
+          </div>
+          <div className="md:col-span-2">
+            <label htmlFor="wa-worksheet" className={label}>Worksheet link (optional)</label>
+            <input id="wa-worksheet" className={field} placeholder="https://docs.google.com/document/d/…/copy" value={f.worksheetUrl} onChange={(e) => update({ worksheetUrl: e.target.value })} />
+            <p className="mt-1 text-xs text-slate-500">
+              Adds an "Open the worksheet" button to the confirmation, both reminders, "What we'll cover", "Updated details" and any custom message
+              that includes the details. Use a link that opens without signing in (for a Google Doc, end it with <code>/copy</code> so people get their own copy).
+              Reminders already scheduled don't change: press "Reschedule reminders" afterwards.
+            </p>
           </div>
           <div>
             <label htmlFor="wa-cal" className={label}>Google Calendar event ID (optional, reference only)</label>
@@ -397,8 +449,65 @@ export const WebinarAdmin = () => {
               <option value="update">Updated details (date, time or link changed)</option>
               <option value="followup-thanks">After the webinar: thank you (+ replay)</option>
               <option value="followup-pathways">Follow-up: learning pathways (promotional, opted-in only)</option>
+              <option value="custom">Write your own message</option>
             </select>
           </div>
+          {template === 'custom' && (
+            <div className="space-y-4 md:col-span-2" data-testid="custom-message-form">
+              <div>
+                <label htmlFor="wa-c-subject" className={label}>Subject</label>
+                <input id="wa-c-subject" className={field} maxLength={120} value={cSubject} onChange={(e) => setCSubject(e.target.value)} />
+              </div>
+              <div>
+                <label htmlFor="wa-c-message" className={label}>Message</label>
+                <textarea id="wa-c-message" rows={8} maxLength={5000} className={field} value={cMessage} onChange={(e) => setCMessage(e.target.value)} />
+                <p className="mt-1 text-xs text-slate-500">
+                  Each email starts "Hi [first name]," and ends with your name, so don't type those. A blank line starts a new paragraph, and
+                  https:// links become clickable. {cMessage.length}/5000
+                </p>
+              </div>
+              <label className="flex items-start gap-2 text-sm text-slate-700">
+                <input type="checkbox" className="mt-1" checked={cDetails} onChange={(e) => setCDetails(e.target.checked)} />
+                <span>Include the date, time and Google Meet join button (and the worksheet, if you added one)</span>
+              </label>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label htmlFor="wa-c-btn" className={label}>Button text (optional)</label>
+                  <input id="wa-c-btn" className={field} maxLength={40} placeholder="Answer in 10 seconds" value={cBtnLabel} onChange={(e) => setCBtnLabel(e.target.value)} />
+                </div>
+                <div>
+                  <label htmlFor="wa-c-url" className={label}>Button link (optional, https://)</label>
+                  <input id="wa-c-url" className={field} placeholder="https://forms.gle/…" value={cBtnUrl} onChange={(e) => setCBtnUrl(e.target.value)} />
+                </div>
+              </div>
+              <fieldset>
+                <legend className={label}>Who receives it</legend>
+                {([
+                  ['registrants', 'Registered participants (event information)'],
+                  ['registrants+waitlist', 'Registered participants and waitlist sign-ups (event information)'],
+                  ['promotional', 'Opted-in registrants only (promotional: an unsubscribe link is added)'],
+                ] as const).map(([value, text]) => (
+                  <label key={value} className="flex items-start gap-2 py-0.5 text-sm text-slate-700">
+                    <input type="radio" name="wa-c-audience" className="mt-1" checked={cAudience === value} onChange={() => setCAudience(value)} />
+                    <span>{text}</span>
+                  </label>
+                ))}
+              </fieldset>
+              <div className="flex flex-wrap items-end gap-3 rounded-xl bg-slate-50 p-4">
+                <div className="min-w-[16rem] flex-1">
+                  <label htmlFor="wa-c-test" className={label}>Send a test copy to</label>
+                  <input id="wa-c-test" type="email" className={field} value={cTestTo} onChange={(e) => setCTestTo(e.target.value)} />
+                </div>
+                <Button variant="outline" onClick={customTest} disabled={!!busy || !exists || !cTestTo.trim()} className="rounded-xl">
+                  {busy === 'test' && <Loader2 className="h-4 w-4 animate-spin" />} Send me a test
+                </Button>
+              </div>
+              <p className="text-xs text-slate-500">
+                Each person receives a given message once: pressing Send again, or sending after a partial failure, skips people who already have it. Change
+                the wording and it counts as a new message.
+              </p>
+            </div>
+          )}
           {template === 'followup-thanks' && (
             <div className="md:col-span-2">
               <label htmlFor="wa-recap" className={label}>Key takeaways (one per line; only what you actually covered)</label>
@@ -407,8 +516,8 @@ export const WebinarAdmin = () => {
           )}
         </div>
         <div className="flex flex-wrap gap-3">
-          <Button variant="outline" onClick={broadcastPreview} disabled={!!busy || !exists} className="rounded-xl">Preview recipients (sends nothing)</Button>
-          <Button onClick={broadcastSend} disabled={!!busy || !exists} className="rounded-xl bg-amber-600 hover:bg-amber-700">
+          <Button variant="outline" onClick={broadcastPreview} disabled={!!busy || !exists || (template === 'custom' && (!cSubject.trim() || !cMessage.trim()))} className="rounded-xl">Preview recipients (sends nothing)</Button>
+          <Button onClick={broadcastSend} disabled={!!busy || !exists || (template === 'custom' && (!cSubject.trim() || !cMessage.trim()))} className="rounded-xl bg-amber-600 hover:bg-amber-700">
             {busy === 'send' && <Loader2 className="h-4 w-4 animate-spin" />} Send…
           </Button>
         </div>

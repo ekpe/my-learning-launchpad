@@ -53,6 +53,8 @@ export interface WebinarEvent {
   capacity: number | null;
   meetUrl: string | null; // private
   replayUrl: string | null; // private
+  /** Optional one-page worksheet for the live session (private: only goes out in emails). */
+  worksheetUrl: string | null;
 }
 
 export interface DeliveryState {
@@ -153,6 +155,7 @@ export async function loadEvent(eventId: string): Promise<WebinarEvent | null> {
     capacity: Number(p.capacity) > 0 ? Number(p.capacity) : null,
     meetUrl: typeof q.meetUrl === "string" && q.meetUrl ? q.meetUrl : null,
     replayUrl: typeof q.replayUrl === "string" && q.replayUrl ? q.replayUrl : null,
+    worksheetUrl: typeof q.worksheetUrl === "string" && q.worksheetUrl ? q.worksheetUrl : null,
   };
 }
 
@@ -222,6 +225,17 @@ function joinText(event: WebinarEvent): string {
   return event.meetUrl ?? "We will email you the Google Meet link before the session.";
 }
 
+const WORKSHEET_LEAD = "A one-page worksheet for the quiet-time activity. Print it, edit it online, or use a notebook.";
+
+/** The worksheet call-to-action. Empty when the event has no worksheet, so existing emails are unchanged. */
+function worksheetHtml(event: WebinarEvent): string {
+  return event.worksheetUrl ? `<p style="margin:18px 0 0"><strong>Your worksheet</strong><br/>${escapeHtml(WORKSHEET_LEAD)}</p>${button("Open the worksheet", event.worksheetUrl)}` : "";
+}
+
+function worksheetText(event: WebinarEvent): string {
+  return event.worksheetUrl ? `\nWorksheet: ${event.worksheetUrl}\n(${WORKSHEET_LEAD})\n` : "";
+}
+
 export function renderEmail(kind: EmailKind, ctx: EmailContext): Rendered {
   const { event } = ctx;
   const name = ctx.firstName || "there";
@@ -275,9 +289,9 @@ export function renderEmail(kind: EmailKind, ctx: EmailContext): Rendered {
         description: calendarDescription,
         location: event.meetUrl ?? "Online (Google Meet)",
       });
-      const text = `Hi ${name},\n\nYou're registered for "${event.title}".\n\nWhen: ${when}\nLength: ${event.durationMinutes} minutes, live online\nJoin: ${joinText(event)}\n\nAdd to your calendar: ${calendarLink}\n(An invitation file is also attached.)\n\nQuestions? ${contactEmail()}\n\nProf. Ekpe Okorafor\nMyLearningLaunchpad AI Leadership Academy`;
+      const text = `Hi ${name},\n\nYou're registered for "${event.title}".\n\nWhen: ${when}\nLength: ${event.durationMinutes} minutes, live online\nJoin: ${joinText(event)}\n${worksheetText(event)}\nAdd to your calendar: ${calendarLink}\n(An invitation file is also attached.)\n\nQuestions? ${contactEmail()}\n\nProf. Ekpe Okorafor\nMyLearningLaunchpad AI Leadership Academy`;
       const html = wrap(
-        `<h1 style="font-size:22px;margin:0 0 12px">You're registered</h1>${hi}<p>Your seat is reserved for <strong>${escapeHtml(event.title)}</strong>.</p>${detailsBlock(schedule())}<p>On the day, open the Google Meet link above a few minutes before the start. You don't need to install anything or create an account.</p>${button("Add to Google Calendar", calendarLink as string)}<p style="color:#64748b;font-size:14px">An .ics invitation is attached for other calendar apps. Please keep this email, since it contains your joining link.</p>${sign}`,
+        `<h1 style="font-size:22px;margin:0 0 12px">You're registered</h1>${hi}<p>Your seat is reserved for <strong>${escapeHtml(event.title)}</strong>.</p>${detailsBlock(schedule())}${worksheetHtml(event)}<p>On the day, open the Google Meet link above a few minutes before the start. You don't need to install anything or create an account.</p>${button("Add to Google Calendar", calendarLink as string)}<p style="color:#64748b;font-size:14px">An .ics invitation is attached for other calendar apps. Please keep this email, since it contains your joining link.</p>${sign}`,
         ctx,
         false
       );
@@ -297,9 +311,9 @@ export function renderEmail(kind: EmailKind, ctx: EmailContext): Rendered {
         "Why human judgment, oversight and accountability stay central",
         "A practical next step for your AI leadership journey",
       ];
-      const text = `Hi ${name},\n\nA quick preview of ${event.title}${when ? ` (${when})` : ""}.\n\nWe'll cover:\n${outcomes.map((o) => `- ${o}`).join("\n")}\n\nNo technical background needed. Bring one workflow or decision from your organization to think about while we talk.\n${event.meetUrl ? `\nJoin: ${event.meetUrl}\n` : ""}\nProf. Ekpe Okorafor`;
+      const text = `Hi ${name},\n\nA quick preview of ${event.title}${when ? ` (${when})` : ""}.\n\nWe'll cover:\n${outcomes.map((o) => `- ${o}`).join("\n")}\n\nNo technical background needed. Bring one workflow or decision from your organization to think about while we talk.\n${event.meetUrl ? `\nJoin: ${event.meetUrl}\n` : ""}${worksheetText(event)}\nProf. Ekpe Okorafor`;
       const html = wrap(
-        `<h1 style="font-size:22px;margin:0 0 12px">What we'll cover</h1>${hi}<p>A quick preview of <strong>${escapeHtml(event.title)}</strong>:</p><ul>${outcomes.map((o) => `<li>${escapeHtml(o)}</li>`).join("")}</ul><p>No technical background is needed. Bring one workflow or decision from your organization to think about while we talk.</p>${when ? detailsBlock(schedule()) : ""}${sign}`,
+        `<h1 style="font-size:22px;margin:0 0 12px">What we'll cover</h1>${hi}<p>A quick preview of <strong>${escapeHtml(event.title)}</strong>:</p><ul>${outcomes.map((o) => `<li>${escapeHtml(o)}</li>`).join("")}</ul><p>No technical background is needed. Bring one workflow or decision from your organization to think about while we talk.</p>${when ? detailsBlock(schedule()) : ""}${worksheetHtml(event)}${sign}`,
         ctx,
         false
       );
@@ -310,9 +324,9 @@ export function renderEmail(kind: EmailKind, ctx: EmailContext): Rendered {
     case "reminder1": {
       const lead = kind === "reminder24" ? "starts in about 24 hours" : "starts in about 1 hour";
       const subject = kind === "reminder24" ? `Tomorrow: ${event.title}` : `Starting soon: ${event.title}`;
-      const text = `Hi ${name},\n\nA reminder that "${event.title}" ${lead}.\n\nWhen: ${when}\nJoin: ${joinText(event)}\n\nProf. Ekpe Okorafor`;
+      const text = `Hi ${name},\n\nA reminder that "${event.title}" ${lead}.\n\nWhen: ${when}\nJoin: ${joinText(event)}\n${worksheetText(event)}\nProf. Ekpe Okorafor`;
       const html = wrap(
-        `<h1 style="font-size:22px;margin:0 0 12px">${kind === "reminder24" ? "See you tomorrow" : "Starting in about an hour"}</h1>${hi}<p><strong>${escapeHtml(event.title)}</strong> ${lead}.</p>${detailsBlock(schedule())}${event.meetUrl ? button("Join on Google Meet", event.meetUrl) : ""}${sign}`,
+        `<h1 style="font-size:22px;margin:0 0 12px">${kind === "reminder24" ? "See you tomorrow" : "Starting in about an hour"}</h1>${hi}<p><strong>${escapeHtml(event.title)}</strong> ${lead}.</p>${detailsBlock(schedule())}${event.meetUrl ? button("Join on Google Meet", event.meetUrl) : ""}${worksheetHtml(event)}${sign}`,
         ctx,
         false
       );
@@ -320,9 +334,9 @@ export function renderEmail(kind: EmailKind, ctx: EmailContext): Rendered {
     }
 
     case "update": {
-      const text = `Hi ${name},\n\nThe details for "${event.title}" have been updated.\n\nWhen: ${when ?? "To be confirmed"}\nJoin: ${joinText(event)}\n\nYour earlier reminders have been replaced with the new timing. Questions? ${contactEmail()}\n\nProf. Ekpe Okorafor`;
+      const text = `Hi ${name},\n\nThe details for "${event.title}" have been updated.\n\nWhen: ${when ?? "To be confirmed"}\nJoin: ${joinText(event)}\n${worksheetText(event)}\nYour earlier reminders have been replaced with the new timing. Questions? ${contactEmail()}\n\nProf. Ekpe Okorafor`;
       const html = wrap(
-        `<h1 style="font-size:22px;margin:0 0 12px">Updated webinar details</h1>${hi}<p>The details for <strong>${escapeHtml(event.title)}</strong> have changed. Please use the information below.</p>${detailsBlock(when ? schedule() : [["When", "To be confirmed"]])}${calendarLink ? button("Add updated time to Google Calendar", calendarLink as string) : ""}${sign}`,
+        `<h1 style="font-size:22px;margin:0 0 12px">Updated webinar details</h1>${hi}<p>The details for <strong>${escapeHtml(event.title)}</strong> have changed. Please use the information below.</p>${detailsBlock(when ? schedule() : [["When", "To be confirmed"]])}${calendarLink ? button("Add updated time to Google Calendar", calendarLink as string) : ""}${worksheetHtml(event)}${sign}`,
         ctx,
         false
       );
@@ -352,6 +366,57 @@ export function renderEmail(kind: EmailKind, ctx: EmailContext): Rendered {
       return { subject: "Where to go next: your AI leadership pathways", text, html };
     }
   }
+}
+
+// ── Custom (admin-written) message ───────────────────────────────────────────
+
+export interface CustomMessage {
+  subject: string;
+  /** Plain text. A blank line starts a new paragraph; https:// links become clickable. */
+  message: string;
+  /** Add the date, time and Join link (and the worksheet, if set). */
+  includeDetails: boolean;
+  buttonLabel?: string;
+  buttonUrl?: string;
+  /** Promotional messages carry the unsubscribe link and go only to opted-in recipients. */
+  promotional: boolean;
+}
+
+/** Escapes text and turns https:// links into anchors. Trailing punctuation stays outside the link. */
+export function linkifyEscaped(text: string): string {
+  return escapeHtml(text).replace(/https:\/\/[^\s<]+/g, (m) => {
+    const trail = (m.match(/[.,;:!?)]+$/) ?? [""])[0];
+    const url = trail ? m.slice(0, -trail.length) : m;
+    return `<a href="${url}" style="color:${NAVY}">${url}</a>${trail}`;
+  });
+}
+
+export function renderCustom(ctx: EmailContext, msg: CustomMessage): Rendered {
+  const { event } = ctx;
+  const name = ctx.firstName || "there";
+  const when = whenText(event);
+  const paragraphs = msg.message.replace(/\r\n/g, "\n").trim().split(/\n{2,}/);
+  const body = paragraphs.map((p) => `<p>${linkifyEscaped(p).replace(/\n/g, "<br/>")}</p>`).join("");
+
+  const rows: [string, string][] = when
+    ? [["When", escapeHtml(when)], ["Length", `${event.durationMinutes} minutes, live online`], ["Join", joinHtml(event)]]
+    : [];
+  const details = msg.includeDetails && rows.length ? detailsBlock(rows) + (event.meetUrl ? button("Join on Google Meet", event.meetUrl) : "") + worksheetHtml(event) : "";
+  const cta = msg.buttonLabel && msg.buttonUrl ? button(msg.buttonLabel, msg.buttonUrl) : "";
+  const unsub = msg.promotional && ctx.unsubscribeUrl ? `\n\nUnsubscribe: ${ctx.unsubscribeUrl}` : "";
+
+  const text =
+    `Hi ${name},\n\n${paragraphs.join("\n\n")}` +
+    (msg.includeDetails && when ? `\n\nWhen: ${when}\nJoin: ${joinText(event)}${worksheetText(event)}` : "") +
+    (msg.buttonLabel && msg.buttonUrl ? `\n\n${msg.buttonLabel}: ${msg.buttonUrl}` : "") +
+    `\n\nProf. Ekpe Okorafor${unsub}`;
+
+  const html = wrap(
+    `<p>Hi ${escapeHtml(name)},</p>${body}${details}${cta}<p style="margin-top:24px">Prof. Ekpe Okorafor<br/><span style="color:#64748b">MyLearningLaunchpad AI Leadership Academy</span></p>`,
+    ctx,
+    msg.promotional
+  );
+  return { subject: msg.subject.replace(/[\r\n]+/g, " ").trim(), text, html };
 }
 
 // ── Resend helpers ───────────────────────────────────────────────────────────

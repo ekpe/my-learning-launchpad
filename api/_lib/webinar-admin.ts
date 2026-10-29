@@ -6,6 +6,7 @@ import {
   getResend,
   loadEvent,
   registrationDocId,
+  renderCustom,
   renderEmail,
   reminderTimes,
   scheduleReminders,
@@ -16,6 +17,8 @@ import {
   type EmailContext,
   type EmailKind,
 } from "./webinar.js";
+import { createHash } from "node:crypto";
+import { EMAIL_RE } from "./webinar-shared.js";
 
 /**
  * Bulk admin operations for webinar registrants. Resend allows ~2 requests per
@@ -109,7 +112,7 @@ export async function saveWebinar(body: any): Promise<Result> {
   if (capacity !== null && !(Number.isInteger(capacity) && capacity > 0)) return fail(400, "capacity must be a positive whole number or empty");
   if (p.registrationStatus === "open" && !startsAt) return fail(400, "Set a date and time before opening registration (use 'waitlist' until then).");
 
-  for (const key of ["meetUrl", "replayUrl"] as const) {
+  for (const key of ["meetUrl", "replayUrl", "worksheetUrl"] as const) {
     const v = q[key];
     if (v) {
       try {
@@ -148,6 +151,7 @@ export async function saveWebinar(body: any): Promise<Result> {
     {
       meetUrl: q.meetUrl ? String(q.meetUrl) : "",
       replayUrl: q.replayUrl ? String(q.replayUrl) : "",
+      worksheetUrl: q.worksheetUrl ? String(q.worksheetUrl) : "",
       calendarEventId: String(q.calendarEventId ?? "").trim().slice(0, 200),
       updatedAt: FieldValue.serverTimestamp(),
     },
@@ -281,6 +285,118 @@ export async function broadcast(body: any): Promise<Result> {
     await sleep(PACE_MS);
   }
   return { status: 200, body: { dryRun: false, template, sent, failed, skipped, nextCursor: exhausted ? null : last } };
+}
+
+const AUDIENCES = ["registrants", "registrants+waitlist", "promotional"] as const;
+type Audience = (typeof AUDIENCES)[number];
+
+const httpsUrl = (v: unknown): v is string => {
+  try {
+    return typeof v === "string" && new URL(v).protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Sends an admin-written message. Three modes, always in this order of caution:
+ *   test:true      one copy to testTo (subject prefixed [TEST]); records nothing
+ *   dryRun (default) counts recipients; sends nothing
+ *   dryRun:false + confirm:true   sends in resumable batches; each person gets a given message at most once
+ * "Once" is keyed on a hash of the message content, so re-running never double-sends but an edited message is a new message.
+ */
+export async function sendCustom(body: any): Promise<Result> {
+  if (!validEventId(body.eventId)) return fail(400, "eventId is required");
+  const subject = typeof body.subject === "string" ? body.subject.replace(/[\r\n]+/g, " ").trim() : "";
+  const message = typeof body.message === "string" ? body.message.replace(/\r\n/g, "\n").trim() : "";
+  if (!subject || subject.length > 120) return fail(400, "Subject is required (up to 120 characters).");
+  if (!message || message.length > 5000) return fail(400, "Message is required (up to 5000 characters).");
+  const buttonLabel = typeof body.buttonLabel === "string" ? body.buttonLabel.trim() : "";
+  const buttonUrl = typeof body.buttonUrl === "string" ? body.buttonUrl.trim() : "";
+  if (buttonLabel || buttonUrl) {
+    if (!buttonLabel || buttonLabel.length > 40) return fail(400, "Button text is required with a link (up to 40 characters).");
+    if (!httpsUrl(buttonUrl)) return fail(400, "The button link must be a valid https:// URL.");
+  }
+  const audience: Audience = AUDIENCES.includes(body.audience) ? body.audience : "registrants";
+  const promotional = audience === "promotional";
+  const includeDetails = body.includeDetails === true;
+
+  const event = await loadEvent(body.eventId);
+  if (!event) return fail(404, "Webinar not found");
+  if (includeDetails && !event.startsAt) return fail(400, "Set the webinar date before including date, time and join details.");
+
+  const msg = { subject, message, includeDetails, buttonLabel: buttonLabel || undefined, buttonUrl: buttonUrl || undefined, promotional };
+  const key = `broadcast_custom_${createHash("sha256").update(JSON.stringify([subject, message, includeDetails, buttonLabel, buttonUrl, audience])).digest("hex").slice(0, 12)}`;
+
+  // 1) test copy
+  if (body.test === true) {
+    if (!EMAIL_RE.test(String(body.testTo ?? "").trim().toLowerCase())) return fail(400, "Enter a valid email address for the test.");
+    const resend = await getResend();
+    if (!resend) return fail(503, "Email is not configured (RESEND_API_KEY / RESEND_FROM_EMAIL).");
+    const ctx: EmailContext = { firstName: "Test", event, marketingOptIn: promotional, unsubscribeUrl: promotional ? unsubscribeUrl("0".repeat(32)) : null };
+    const r = await sendRendered(resend, String(body.testTo).trim().toLowerCase(), { ...renderCustom(ctx, msg), subject: `[TEST] ${subject}` });
+    return r.id ? { status: 200, body: { test: true, sent: 1 } } : fail(502, r.error ?? "The test email could not be sent.");
+  }
+
+  const eligible = (d: FirebaseFirestore.DocumentData) => {
+    if (promotional) return d.type === "registration" && d.marketingOptIn === true;
+    return d.type === "registration" || (audience === "registrants+waitlist" && d.type === "interest");
+  };
+
+  // 2) dry run
+  if (body.dryRun !== false) {
+    let total = 0;
+    let alreadySent = 0;
+    let cursor: string | null = null;
+    for (;;) {
+      const snap = await page(event.id, cursor, 300);
+      for (const doc of snap.docs) {
+        const d = doc.data();
+        if (!eligible(d)) continue;
+        total++;
+        if (d.delivery?.[key]?.status === "sent") alreadySent++;
+      }
+      if (snap.size < 300) break;
+      cursor = snap.docs[snap.docs.length - 1].id;
+    }
+    return { status: 200, body: { dryRun: true, audience, promotional, recipients: total, alreadySent, toSend: total - alreadySent } };
+  }
+
+  // 3) send
+  if (body.confirm !== true) return fail(400, "Set confirm: true to send.");
+  if (promotional && !unsubscribeUrl("0".repeat(32))) return fail(503, "WEBINAR_TOKEN_SECRET is not set, so promotional emails (which require an unsubscribe link) are disabled.");
+  const resend = await getResend();
+  if (!resend) return fail(503, "Email is not configured (RESEND_API_KEY / RESEND_FROM_EMAIL).");
+
+  const started = Date.now();
+  const snap = await page(event.id, body.cursor ?? null);
+  let sent = 0;
+  let failed = 0;
+  let skipped = 0;
+  let last: string | null = null;
+  let exhausted = snap.size < 50;
+
+  for (const doc of snap.docs) {
+    if (Date.now() - started > BUDGET_MS) {
+      exhausted = false;
+      break;
+    }
+    last = doc.id;
+    const d = doc.data();
+    if (!eligible(d) || d.delivery?.[key]?.status === "sent") {
+      skipped++;
+      continue;
+    }
+    const ctx: EmailContext = { firstName: d.firstName, event, marketingOptIn: !!d.marketingOptIn, unsubscribeUrl: unsubscribeUrl(doc.id) };
+    const r = await sendRendered(resend, d.email, renderCustom(ctx, msg));
+    await doc.ref.update({
+      [`delivery.${key}`]: r.id ? ({ status: "sent", id: r.id, at: new Date().toISOString() } satisfies DeliveryState) : ({ status: "failed", error: r.error } satisfies DeliveryState),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    r.id ? sent++ : failed++;
+    await sleep(PACE_MS);
+  }
+  return { status: 200, body: { dryRun: false, audience, sent, failed, skipped, nextCursor: exhausted ? null : last } };
 }
 
 /** Pulls the latest delivery event for each stored Resend email id. */

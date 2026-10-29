@@ -16,7 +16,7 @@
  *   GET    /api/admin?resource=course-readiness&courseId=:id[&verify=1]
  *   GET    /api/admin?resource=webinar-get&eventId=:id
  *   POST   /api/admin?resource=webinar-save | webinar-reschedule | webinar-broadcast |
- *                              webinar-refresh-delivery | webinar-mark-attended
+ *                              webinar-custom | webinar-refresh-delivery | webinar-mark-attended
  */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { auth, db, FieldValue, adminInitError, getAdminApp } from "./_lib/firebase-admin.js";
@@ -25,7 +25,7 @@ import { handleOptions } from "./_lib/cors.js";
 import { getStorage } from "firebase-admin/storage";
 import { v4 as uuidv4 } from "uuid";
 import { handleCourseAdminOp, syncCourseList } from "./_lib/course-admin.js";
-import { broadcast, getWebinar, markAttended, refreshDelivery, rescheduleReminders, saveWebinar } from "./_lib/webinar-admin.js";
+import { broadcast, getWebinar, markAttended, refreshDelivery, rescheduleReminders, saveWebinar, sendCustom } from "./_lib/webinar-admin.js";
 
 export const config = { api: { bodyParser: false } };
 
@@ -220,6 +220,7 @@ export default withAdmin(async (req: VercelRequest, res: VercelResponse) => {
       "webinar-save": saveWebinar,
       "webinar-reschedule": rescheduleReminders,
       "webinar-broadcast": broadcast,
+      "webinar-custom": sendCustom,
       "webinar-refresh-delivery": refreshDelivery,
       "webinar-mark-attended": markAttended,
     };
