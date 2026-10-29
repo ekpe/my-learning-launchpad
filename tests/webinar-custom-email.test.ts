@@ -258,3 +258,23 @@ test("custom message: sending is unavailable when email is not configured", asyn
     process.env.RESEND_API_KEY = key;
   }
 });
+
+test("custom message: the button sits directly under the message and the details come after it", async () => {
+  seedEvent({}, { meetUrl: MEET, worksheetUrl: SHEET });
+  await register();
+  mail.calls.length = 0;
+  await admin.sendCustom(
+    msg({ message: "Please answer one question.", includeDetails: true, buttonLabel: "Answer in 10 seconds", buttonUrl: "https://forms.gle/abc123", dryRun: false, confirm: true })
+  );
+  const [s] = mail.sends();
+  const html: string = s.body.html;
+  const at = (needle: string) => html.indexOf(needle);
+  assert.ok(at("Please answer one question.") > -1);
+  assert.ok(at("Please answer one question.") < at("Answer in 10 seconds"), "button follows the message");
+  assert.ok(at("Answer in 10 seconds") < at("Join on Google Meet"), "button comes before the Join details");
+  assert.ok(at("Answer in 10 seconds") < at("Open the worksheet"), "button comes before the worksheet");
+  assert.ok(at("Join on Google Meet") < at("Prof. Ekpe Okorafor"), "details still come before the sign-off");
+
+  const text: string = s.body.text;
+  assert.ok(text.indexOf("Answer in 10 seconds:") > -1 && text.indexOf("Answer in 10 seconds:") < text.indexOf("When:"), "plain-text version has the same order");
+});

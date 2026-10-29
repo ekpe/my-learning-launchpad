@@ -405,14 +405,15 @@ export function renderCustom(ctx: EmailContext, msg: CustomMessage): Rendered {
   const cta = msg.buttonLabel && msg.buttonUrl ? button(msg.buttonLabel, msg.buttonUrl) : "";
   const unsub = msg.promotional && ctx.unsubscribeUrl ? `\n\nUnsubscribe: ${ctx.unsubscribeUrl}` : "";
 
+  // Order: your message, then the button (the main action), then the date/Join/worksheet details underneath.
   const text =
     `Hi ${name},\n\n${paragraphs.join("\n\n")}` +
-    (msg.includeDetails && when ? `\n\nWhen: ${when}\nJoin: ${joinText(event)}${worksheetText(event)}` : "") +
     (msg.buttonLabel && msg.buttonUrl ? `\n\n${msg.buttonLabel}: ${msg.buttonUrl}` : "") +
+    (msg.includeDetails && when ? `\n\nWhen: ${when}\nJoin: ${joinText(event)}${worksheetText(event)}` : "") +
     `\n\nProf. Ekpe Okorafor${unsub}`;
 
   const html = wrap(
-    `<p>Hi ${escapeHtml(name)},</p>${body}${details}${cta}<p style="margin-top:24px">Prof. Ekpe Okorafor<br/><span style="color:#64748b">MyLearningLaunchpad AI Leadership Academy</span></p>`,
+    `<p>Hi ${escapeHtml(name)},</p>${body}${cta}${details}<p style="margin-top:24px">Prof. Ekpe Okorafor<br/><span style="color:#64748b">MyLearningLaunchpad AI Leadership Academy</span></p>`,
     ctx,
     msg.promotional
   );
